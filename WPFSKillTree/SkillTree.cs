@@ -79,13 +79,8 @@ namespace POESKillTree
 
 		HashSet<SkillNode> SolveSet = new HashSet<SkillNode>();
 
-		public void ToggleToSolve(SkillNode node)
+		public void Solve()
 		{
-			if (SolveSet.Contains(node))
-				SolveSet.Remove(node);
-			else
-				SolveSet.Add(node);
-
 			DrawSolveHalo(SolveSet);
 
 			if (SolveSet.Count > 1) {
@@ -94,8 +89,18 @@ namespace POESKillTree
 			} else {
 				SimpleGraph.Clear();
 			}
-			
+
 			DrawSolvePath(SimpleGraph);
+		}
+
+		public void ToggleToSolve(SkillNode node)
+		{
+			if (SolveSet.Contains(node))
+				SolveSet.Remove(node);
+			else
+				SolveSet.Add(node);
+
+			Solve();
 		}
 
 		Dictionary<SkillNode, Dictionary<SkillNode, HashSet<SkillNode>>> ShortestPathTable = new Dictionary<SkillNode, Dictionary<SkillNode, HashSet<SkillNode>>>();
@@ -302,12 +307,12 @@ namespace POESKillTree
 			SimpleGraph.Clear();
 
 			foreach (SkillNode node in Skillnodes.Values) {
-				if (node.spc != null || node.Mastery || node.isExternal)
+				if (!SolveSet.Contains(node) && (node.spc != null || node.Mastery || node.isExternal))
 					continue;
 
 				SimpleGraph.Add(node, new Dictionary<SkillNode, int>());
 				foreach (SkillNode neighbor in node.Neighbor) {
-					if (neighbor.spc != null || neighbor.Mastery || neighbor.isExternal)
+					if (!SolveSet.Contains(neighbor) && (neighbor.spc != null || neighbor.Mastery || neighbor.isExternal))
 						continue;
 
 					SimpleGraph[node].Add(neighbor, 1);
@@ -560,13 +565,19 @@ namespace POESKillTree
             }
             set
             {
+				var oldChar = Skillnodes.First(nd => nd.Value.name.ToUpper() == CharName[chartype]);
+
+				if (SolveSet.Contains(oldChar.Value))
+					SolveSet.Remove(oldChar.Value);
 
                 chartype = value;
                 SkilledNodes.Clear();
                 var node = Skillnodes.First(nd => nd.Value.name.ToUpper() == CharName[chartype]);
+				SolveSet.Add(node.Value);
                 SkilledNodes.Add(node.Value.id);
                 UpdateAvailNodes();
                 DrawFaces();
+				Solve();
             }
         }
         public List<ushort> GetShortestPathTo(ushort targetNode)
