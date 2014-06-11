@@ -90,11 +90,12 @@ namespace POESKillTree
 
 			if (SolveSet.Count > 1) {
 				RecalculateExternal();
-
 				ConstructSimpleGraph();
-
-				DrawSolvePath(SimpleGraph);
+			} else {
+				SimpleGraph.Clear();
 			}
+			
+			DrawSolvePath(SimpleGraph);
 		}
 
 		Dictionary<SkillNode, Dictionary<SkillNode, HashSet<SkillNode>>> ShortestPathTable = new Dictionary<SkillNode, Dictionary<SkillNode, HashSet<SkillNode>>>();
