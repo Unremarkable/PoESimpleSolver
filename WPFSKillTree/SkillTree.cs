@@ -96,6 +96,7 @@ namespace POESKillTree
 			}
 			
 			DrawSolvePath(SimpleGraph);
+            DrawLinkBackgroundLayer();
 		}
 
 		Dictionary<SkillNode, Dictionary<SkillNode, HashSet<SkillNode>>> ShortestPathTable = new Dictionary<SkillNode, Dictionary<SkillNode, HashSet<SkillNode>>>();
@@ -173,21 +174,42 @@ namespace POESKillTree
 				node.isExternal = false;
 				node.isInternal = false;
 			}
+            int edgeId = 1;
 
-			foreach (var skillA in SolveSet)
-			foreach (var skillB in SolveSet) {
-				if (skillA == skillB)
-					continue;
-
-				foreach (SkillNode node in GetShortestPathNodes(skillA, skillB)) {
-					node.isInternal = true;
-				}
-			}
+            Dictionary<SkillNode, List<int>> edgeIds = new Dictionary<SkillNode, List<int>>();
+            HashSet<SkillNode> remaining = new HashSet<SkillNode>(SolveSet);
+			foreach (var skillA in SolveSet){
+                remaining.Remove(skillA);
+                foreach (var skillB in remaining) {
+				    foreach (SkillNode node in GetShortestPathNodes(skillA, skillB)) {
+					    node.isInternal = true;
+                        if (!edgeIds.ContainsKey(node)) { edgeIds[node] = new List<int>(); }
+                        edgeIds[node].Add(edgeId);
+				    }
+                    
+                    edgeId++;
+			    }
+            }
 
 			List<ushort> external = new List<ushort> { 40633, 34098, 9660, 12926, 31961, 44941, 59763, 18663, 22535, 31703, 22115, 24426, 14914, 54922 };
 			foreach (ushort externalId in external) {
 				MarkExternalRecursively(Skillnodes[externalId]);
 			}
+            /*
+            List<SkillNode> undecided = new List<SkillNode>(Skillnodes.Values.Where(node => (!node.isExternal && !node.isInternal)));
+
+            while (undecided.Count > 0) {
+                SkillNode current = undecided.First();
+                HashSet<SkillNode> visited = new HashSet<SkillNode>();
+                HashSet<SkillNode> frontier = new HashSet<SkillNode>();
+                frontier.Add(current);
+                while (frontier.Count > 0) {
+                    visited.UnionWith(frontier);
+                    foreach (SkillNode node in Skillnodes) { 
+
+                    }
+                }
+            }*/
 		}
 
 		Dictionary<SkillNode, Dictionary<SkillNode, int>> SimpleGraph = new Dictionary<SkillNode, Dictionary<SkillNode, int>>();
@@ -490,7 +512,7 @@ namespace POESKillTree
             DrawSkillIconLayer( );
             DrawBackgroundLayer( );
             InitFaceBrushesAndLayer( );
-            DrawLinkBackgroundLayer( links );
+            DrawLinkBackgroundLayer( );
             InitOtherDynamicLayers( );
             CreateCombineVisual( );
 

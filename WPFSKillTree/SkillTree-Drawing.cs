@@ -14,7 +14,7 @@ namespace POESKillTree
         #region Members
         public DrawingVisual picSkillIconLayer;
         public DrawingVisual picSkillSurround;
-        public DrawingVisual picLinks;
+        public DrawingVisual picLinks = new DrawingVisual();
         public DrawingVisual picActiveLinks;
         public DrawingVisual picPathOverlay;
         public DrawingVisual picBackground;
@@ -137,39 +137,30 @@ namespace POESKillTree
             picFaces = new DrawingVisual();
 
         }
-        private void DrawLinkBackgroundLayer(List<ushort[]> links)
+
+        private void DrawLinkBackgroundLayer()
         {
-            picLinks = new DrawingVisual();
             Pen pen2 = new Pen(Brushes.DarkSlateGray, 32);
+            HashSet<ushort> visited = new HashSet<ushort>(SkilledNodes);
             using (DrawingContext dc = picLinks.RenderOpen())
             {
-                foreach (var nid in links)
+                foreach (var skillNode in Skillnodes)
                 {
-                    var n1 = Skillnodes[nid[0]];
-                    var n2 = Skillnodes[nid[1]];
-                    DrawConnection(dc, pen2, n1, n2);
-                    //if (n1.NodeGroup == n2.NodeGroup && n1.orbit == n2.orbit)
-                    //{
-                    //    if (n1.Arc - n2.Arc > 0 && n1.Arc - n2.Arc < Math.PI || n1.Arc - n2.Arc < -Math.PI)
-                    //    {
-                    //        dc.DrawArc(null, pen2, n1.Position, n2.Position,
-                    //                   new Size(SkillTree.SkillNode.orbitRadii[n1.orbit],
-                    //                            SkillTree.SkillNode.orbitRadii[n1.orbit]));
-                    //    }
-                    //    else
-                    //    {
-                    //        dc.DrawArc(null, pen2, n2.Position, n1.Position,
-                    //                   new Size(SkillTree.SkillNode.orbitRadii[n1.orbit],
-                    //                            SkillTree.SkillNode.orbitRadii[n1.orbit]));
-                    //    }
-                    //}
-                    //else
-                    //{
-                    //    dc.DrawLine(pen2, n1.Position, n2.Position);
-                    //}
+                    if (!visited.Contains(skillNode.Key) && !skillNode.Value.isExternal)
+                    {
+                        foreach (var neighbor in skillNode.Value.Neighbor)
+                        {
+                            if (!neighbor.isExternal)
+                            {
+                                DrawConnection(dc, pen2, skillNode.Value, neighbor);
+                            }
+                        }
+                        visited.Add(skillNode.Key);
+                    }
                 }
             }
         }
+
         private void DrawSkillIconLayer()
         {
             Pen pen = new Pen(Brushes.Black, 5);
