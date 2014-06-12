@@ -79,6 +79,78 @@ namespace POESKillTree
 
 		HashSet<SkillNode> SolveSet = new HashSet<SkillNode>();
 
+		private Dictionary<SkillNode, SkillNode> FindGraphOfSize(Dictionary<SkillNode, SkillNode> solution, HashSet<SkillNode> graph, int remaining)
+		{
+			if (graph.IsSupersetOf(SolveSet))
+				return solution;
+
+			foreach (SkillNode node in graph) {
+				foreach (SkillNode next in SimpleGraph[node].Keys) {
+					if (!graph.Contains(next) && SimpleGraph[node][next] <= remaining) {
+						HashSet<SkillNode> newGraph = new HashSet<SkillNode>(graph);
+						newGraph.Add(next);
+						solution.Add(next, node);
+						
+						var result = FindGraphOfSize(solution, newGraph, remaining - SimpleGraph[node][next]);
+						if (result != null && result.Count > 0)
+							return result;
+
+						solution.Remove(next);
+					}
+				}
+			}
+
+			return null;
+			
+			/*
+			if (graph.IsSupersetOf(SolveSet))
+				return solution;
+
+			foreach (SkillNode node in graph) {
+				foreach (SkillNode next in SimpleGraph[node].Keys) {
+					if (!graph.Contains(next) && SimpleGraph[node][next] <= remaining) {
+						HashSet<SkillNode> newGraph = new HashSet<SkillNode>(graph);
+						newGraph.Add(next);
+						solution.UnionWith(FindGraphOfSize(solution, newGraph, remaining - SimpleGraph[node][next]));
+					}
+				}
+			}
+
+			return solution;*/
+		}
+
+		private Dictionary<SkillNode, SkillNode> SolveSimpleGraph()
+		{
+
+			Dictionary<SkillNode, SkillNode> solution;
+			for (int i = 1; i < 90; ++i) {
+				solution = new Dictionary<SkillNode, SkillNode>();
+				Console.WriteLine("Looking for solution of length {0}", i);
+				HashSet<SkillNode> graph = new HashSet<SkillNode>();
+				graph.Add(SolveSet.First());
+				if ((solution = FindGraphOfSize(solution, graph, i)) != null)
+					return solution;
+			}
+			return null;
+		}
+
+		public void Solve()
+		{
+			DrawSolveHalo(SolveSet);
+
+			if (SolveSet.Count > 1) {
+				RecalculateExternal();
+				ConstructSimpleGraph();
+				DrawSimpleGraph(SimpleGraph);
+				DrawSolvePath(SolveSimpleGraph());
+			} else {
+				SimpleGraph.Clear();
+				DrawSimpleGraph(SimpleGraph);
+			}
+			
+			DrawLinkBackgroundLayer();
+		}
+
 		public void ToggleToSolve(SkillNode node)
 		{
 			if (SolveSet.Contains(node))
@@ -86,28 +158,20 @@ namespace POESKillTree
 			else
 				SolveSet.Add(node);
 
-			DrawSolveHalo(SolveSet);
-
-			if (SolveSet.Count > 1) {
-				RecalculateExternal();
-				ConstructSimpleGraph();
-			} else {
-				SimpleGraph.Clear();
-			}
-			
-			DrawSolvePath(SimpleGraph);
-            DrawLinkBackgroundLayer();
+			Solve();
 		}
 
-		Dictionary<SkillNode, Dictionary<SkillNode, HashSet<SkillNode>>> ShortestPathTable = new Dictionary<SkillNode, Dictionary<SkillNode, HashSet<SkillNode>>>();
+		Dictionary<SkillNode, Dictionary<SkillNode, Dictionary<SkillNode, int>>> ShortestPathTable = new Dictionary<SkillNode, Dictionary<SkillNode, Dictionary<SkillNode, int>>>();
 
 		public void CalculateAllShortestPaths()
 		{
 			foreach (var skillNode in Skillnodes.Values) {
-				ShortestPathTable[skillNode] = new Dictionary<SkillNode, HashSet<SkillNode>>();
+				ShortestPathTable[skillNode] = new Dictionary<SkillNode, Dictionary<SkillNode, int>>();
+				ShortestPathTable[skillNode][skillNode] = new Dictionary<SkillNode, int>();
+				ShortestPathTable[skillNode][skillNode].Add(skillNode, 0);
 				foreach (var neighbor in skillNode.Neighbor) {
-					ShortestPathTable[skillNode][neighbor] = new HashSet<SkillNode>();
-					ShortestPathTable[skillNode][neighbor].Add(neighbor);
+					ShortestPathTable[skillNode][neighbor] = new Dictionary<SkillNode, int>();
+					ShortestPathTable[skillNode][neighbor].Add(neighbor, 1);
 				}
 			}
 
@@ -122,8 +186,12 @@ namespace POESKillTree
 						foreach (var neighbor in frontierNode.Neighbor) {
 							if (!visited.Contains(neighbor) && !frontier.Contains(neighbor)) {
 								newFrontier.Add(neighbor);
-								if (!ShortestPathTable[originNode].ContainsKey(neighbor)) { ShortestPathTable[originNode][neighbor] = new HashSet<SkillNode>(); }
-								ShortestPathTable[originNode][neighbor].UnionWith(ShortestPathTable[originNode][frontierNode]);
+								if (!ShortestPathTable[originNode].ContainsKey(neighbor)) { 
+									ShortestPathTable[originNode][neighbor] = new Dictionary<SkillNode, int>();
+								}
+								foreach (var kv in ShortestPathTable[originNode][frontierNode])
+									ShortestPathTable[originNode][neighbor][kv.Key] = kv.Value + 1;
+//								ShortestPathTable[originNode][neighbor].UnionWith(ShortestPathTable[originNode][frontierNode]);
 							}
 						}
 					}
@@ -143,8 +211,8 @@ namespace POESKillTree
 			currentSet.Add(from);
 
 			foreach (var pathStart in ShortestPathTable[from][to]) {
-				if (!currentSet.Contains(pathStart)) {
-					GetShortestPathNodes(pathStart, to, currentSet);
+				if (!currentSet.Contains(pathStart.Key)) {
+					GetShortestPathNodes(pathStart.Key, to, currentSet);
 				}
 			}
 		}
@@ -164,6 +232,7 @@ namespace POESKillTree
 
 			node.isExternal = true;
 			foreach (SkillNode neighbor in node.Neighbor) {
+
 				MarkExternalRecursively(neighbor);
 			}
 		}
@@ -216,57 +285,109 @@ namespace POESKillTree
 
 		private bool Simplify()
 		{
-			bool simplified = false;
-			bool didWork = false;
+			foreach (SkillNode node in SimpleGraph.Keys) {
+				if (SolveSet.Contains(node)/* || SkilledNodes.Contains(node.id)*/)
+					continue;
 
-			do {
-				simplified = false;
-				foreach (SkillNode node in SimpleGraph.Keys) {
-					if (SolveSet.Contains(node)/* || SkilledNodes.Contains(node.id)*/)
-						continue;
+				Dictionary<SkillNode, int> neighbors = SimpleGraph[node];
 
-					Dictionary<SkillNode, int> neighbors = SimpleGraph[node];
+				if (neighbors.ContainsKey(node)) {
+					neighbors.Remove(node);
+					return true;
+				}
 
-					if (neighbors.ContainsKey(node)) {
-						SimpleGraph.Remove(node);
-						simplified = true;
-						break;
+				if (neighbors.Count == 0) {
+					SimpleGraph.Remove(node);
+					return true;
+				}
+
+				if (neighbors.Count == 1) {
+					SimpleGraph[neighbors.Keys.First()].Remove(node);
+					SimpleGraph.Remove(node);
+					return true;
+				}
+
+				if (SimpleGraph[node].Count == 2) {
+					SkillNode neighborA = neighbors.Keys.First();
+					SkillNode neighborB = neighbors.Keys.Last();
+
+					int cost = SimpleGraph[node][neighborA]
+								+ SimpleGraph[node][neighborB];
+
+					if (!SimpleGraph[neighborA].ContainsKey(neighborB) || SimpleGraph[neighborA][neighborB] > cost) {
+						SimpleGraph[neighborA][neighborB] = cost;
+						SimpleGraph[neighborB][neighborA] = cost;
 					}
 
-					if (neighbors.Count == 1) {
-						SimpleGraph[neighbors.Keys.First()].Remove(node);
-						SimpleGraph.Remove(node);
-						simplified = true;
-						break;
-					}
+					SimpleGraph[neighborA].Remove(node);
+					SimpleGraph[neighborB].Remove(node);
 
-					if (SimpleGraph[node].Count == 2) {
-						SkillNode neighborA = neighbors.Keys.First();
-						SkillNode neighborB = neighbors.Keys.Last();
+					SimpleGraph.Remove(node);
+					return true;
+				}
+			}
 
-						int cost = SimpleGraph[node][neighborA]
-								 + SimpleGraph[node][neighborB];
-
-						if (!SimpleGraph[neighborA].ContainsKey(neighborB) || SimpleGraph[neighborA][neighborB] > cost) {
-							SimpleGraph[neighborA][neighborB] = cost;
-							SimpleGraph[neighborB][neighborA] = cost;
-						}
-
-						SimpleGraph[neighborA].Remove(node);
-						SimpleGraph[neighborB].Remove(node);
-
-						SimpleGraph.Remove(node);
-						simplified = true;
-						break;
+			foreach (SkillNode origin in SimpleGraph.Keys) {
+				foreach (SkillNode destination in SimpleGraph[origin].Keys) {
+					int distance = SimpleGraph[origin][destination];
+					if (ShortestOtherPath(origin, destination) <= distance) {
+						SimpleGraph[origin].Remove(destination);
+						SimpleGraph[destination].Remove(origin);
+						return true;
 					}
 				}
-				if (simplified)
-					didWork = true;
-			} while (simplified);
-			return didWork;
+			}
+
+			foreach (SkillNode node in SimpleGraph.Keys) {
+				foreach (var neighbor in SimpleGraph[node].Keys) {
+					int best = 0x7ffffff;
+					foreach (SkillNode ep in SolveSet) {
+						int myDist = ShortestPathTable[node][ep].First().Value;
+						int itDist = ShortestPathTable[neighbor][ep].First().Value;
+						int cost = SimpleGraph[node][neighbor];
+						int diff = (itDist + cost) - myDist;
+						if (diff < best)
+							best = diff;
+					}
+
+					//						if (!SolveSet.Any(ep => ShortestPathTable[node][ep].First().Value > ShortestPathTable[neighbor][ep].First().Value + SimpleGraph[node][neighbor])) {
+					if (best > 0) {
+						SimpleGraph[node].Remove(neighbor);
+						SimpleGraph[neighbor].Remove(node);
+						return true;
+					}
+				}
+			}
+			return false;
 		}
 
 		private int ShortestPath(SkillNode origin, SkillNode destination)
+		{
+			HashSet<Tuple<SkillNode, int>> queue = new HashSet<Tuple<SkillNode, int>>();
+			HashSet<SkillNode> visited = new HashSet<SkillNode>();
+
+			queue.Add(new Tuple<SkillNode, int>(origin, 0));
+
+			while (queue.Count > 0) {
+				Tuple<SkillNode, int> min = queue.OrderBy(tuple => tuple.Item2).First();
+
+				if (min.Item1 == destination) {
+					return min.Item2;
+				}
+
+				queue.Remove(min);
+
+				visited.Add(min.Item1);
+				foreach (SkillNode neighbor in SimpleGraph[min.Item1].Keys) {
+					if (!visited.Contains(neighbor))
+						queue.Add(new Tuple<SkillNode, int>(neighbor, min.Item2 + SimpleGraph[min.Item1][neighbor]));
+				}
+			}
+
+			return 0x7FFFFFFF;
+		}
+
+		private int ShortestOtherPath(SkillNode origin, SkillNode destination)
 		{
 			HashSet<Tuple<SkillNode, int>> queue = new HashSet<Tuple<SkillNode, int>>();
 			HashSet<SkillNode> visited = new HashSet<SkillNode>();
@@ -294,49 +415,24 @@ namespace POESKillTree
 			return 0x7FFFFFFF;
 		}
 
-		private bool Shorten()
-		{
-			bool shortening = false;
-			bool didWork = false;
-			do {
-				shortening = false;
-				foreach (SkillNode origin in SimpleGraph.Keys) {
-					foreach (SkillNode destination in SimpleGraph[origin].Keys) {
-						int distance = SimpleGraph[origin][destination];
-						if (ShortestPath(origin, destination) <= distance) {
-							SimpleGraph[origin].Remove(destination);
-							SimpleGraph[destination].Remove(origin);
-							shortening = true;
-							break;
-						}
-					}
-					if (shortening)
-						break;
-				}
-				if (shortening)
-					didWork = true;
-			} while (shortening);
-			return didWork;
-		}
-
 		private void ConstructSimpleGraph()
 		{
 			SimpleGraph.Clear();
 
 			foreach (SkillNode node in Skillnodes.Values) {
-				if (node.spc != null || node.Mastery || node.isExternal)
+				if (!SolveSet.Contains(node) && (node.spc != null || node.Mastery || node.isExternal))
 					continue;
 
 				SimpleGraph.Add(node, new Dictionary<SkillNode, int>());
 				foreach (SkillNode neighbor in node.Neighbor) {
-					if (neighbor.spc != null || neighbor.Mastery || neighbor.isExternal)
+					if (!SolveSet.Contains(neighbor) && (neighbor.spc != null || neighbor.Mastery || neighbor.isExternal))
 						continue;
 
 					SimpleGraph[node].Add(neighbor, 1);
 				}
-			} 
+			}
 
-			while (Simplify() && Shorten()) ;
+			while (Simplify()) ;
 
 			Console.WriteLine("[Core Nodes] {0}", SimpleGraph.Count);
 			Console.WriteLine("[Edges] {0}", SimpleGraph.Sum(dict => dict.Value.Count));
@@ -582,13 +678,19 @@ namespace POESKillTree
             }
             set
             {
+				var oldChar = Skillnodes.First(nd => nd.Value.name.ToUpper() == CharName[chartype]);
+
+				if (SolveSet.Contains(oldChar.Value))
+					SolveSet.Remove(oldChar.Value);
 
                 chartype = value;
                 SkilledNodes.Clear();
                 var node = Skillnodes.First(nd => nd.Value.name.ToUpper() == CharName[chartype]);
+				SolveSet.Add(node.Value);
                 SkilledNodes.Add(node.Value.id);
                 UpdateAvailNodes();
                 DrawFaces();
+				Solve();
             }
         }
         public List<ushort> GetShortestPathTo(ushort targetNode)
