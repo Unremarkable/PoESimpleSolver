@@ -22,6 +22,7 @@ namespace POESKillTree
 		public DrawingVisual picHighlights;
 		public DrawingVisual picSolveHalos;
 		public DrawingVisual picSolvePaths;
+		public DrawingVisual picSimplePaths;
         public DrawingVisual picSkillBaseSurround;
         public DrawingVisual SkillTreeVisual;
 
@@ -43,6 +44,7 @@ namespace POESKillTree
 			SkillTreeVisual.Children.Add(picHighlights);
 			SkillTreeVisual.Children.Add(picSolveHalos);
 			SkillTreeVisual.Children.Add(picSolvePaths);
+			SkillTreeVisual.Children.Add(picSimplePaths);
         }
         #endregion
         private void InitOtherDynamicLayers()
@@ -52,6 +54,7 @@ namespace POESKillTree
 			picHighlights = new DrawingVisual();
 			picSolveHalos = new DrawingVisual();
 			picSolvePaths = new DrawingVisual();
+			picSimplePaths = new DrawingVisual();
         }
 
 		public void DrawSolveHalo(HashSet<SkillNode> nodes)
@@ -64,13 +67,25 @@ namespace POESKillTree
 			}
 		}
 
-		public void DrawSolvePath(Dictionary<SkillNode, Dictionary<SkillNode, int>> paths)
+		public void DrawSolvePath(Dictionary<SkillNode, SkillNode> edges)
 		{
-			System.Windows.Media.Brush brush = new SolidColorBrush(Color.FromArgb(128, 255, 0, 0));
+			System.Windows.Media.Brush brush = new SolidColorBrush(Color.FromArgb(255, 0, 255, 0));
+			System.Windows.Media.Pen hpen = new System.Windows.Media.Pen(brush, 15f);
+
+			using (DrawingContext dc = picSolvePaths.RenderOpen()) {
+				foreach (var vkp in edges) {
+					dc.DrawLine(hpen, vkp.Key.Position, vkp.Value.Position);
+				}
+			}
+		}
+
+		public void DrawSimpleGraph(Dictionary<SkillNode, Dictionary<SkillNode, int>> paths)
+		{
+			System.Windows.Media.Brush brush = new SolidColorBrush(Color.FromArgb(32, 255, 0, 0));
 			System.Windows.Media.Pen hpen = new System.Windows.Media.Pen(brush, 15f);
 
 
-			using (DrawingContext dc = picSolvePaths.RenderOpen()) {
+			using (DrawingContext dc = picSimplePaths.RenderOpen()) {
 				foreach (KeyValuePair<SkillNode, Dictionary<SkillNode, int>> pair in paths) {
 					foreach (var ep in pair.Value) {
 						dc.DrawLine(hpen, pair.Key.Position, ep.Key.Position);
