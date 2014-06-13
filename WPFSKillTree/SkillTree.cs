@@ -207,54 +207,89 @@ namespace POESKillTree
             }
 		}*/
 
-		public class TupleComparer<T> : IEqualityComparer<Tuple<T, T>>
+		public class EdgeComparer : IEqualityComparer<Tuple<ushort, ushort>>
 		{
-			bool IEqualityComparer<Tuple<T,T>>.Equals(Tuple<T,T> x, Tuple<T,T> y)
+			public static EdgeComparer Instance = new EdgeComparer();
+
+			public bool Equals(Tuple<ushort, ushort> x, Tuple<ushort, ushort> y)
 			{
-				return (x.Item1.Equals(y.Item1) && x.Item2.Equals(y.Item2))
-					|| (x.Item1.Equals(y.Item2) && x.Item2.Equals(y.Item2));
+				return (x.Item1 == y.Item1 && x.Item2 == y.Item2)
+					|| (x.Item1 == y.Item2 && x.Item2 == y.Item1);
 			}
 
-			int IEqualityComparer<Tuple<T,T>>.GetHashCode(Tuple<T,T> obj)
+			public int GetHashCode(Tuple<ushort, ushort> obj)
 			{
-				return obj.Item1.GetHashCode() ^ obj.Item2.GetHashCode();
+				if (obj.Item1 < obj.Item2)
+					return (obj.Item1 << sizeof(ushort)) | obj.Item2;
+				else
+					return (obj.Item2 << sizeof(ushort)) | obj.Item1;
 			}
 		}
 
 		public class TreePart
+			: IEquatable<TreePart>
 		{
 			public TreePart(SkillNode start)
 			{
-				this.Nodes = new HashSet<ushort>();
-				this.Edges = new List<Tuple<ushort, ushort>>();
-				this.Size  = 1;
+				this.Nodes    = new HashSet<ushort>();
+				this.Edges    = new List<Tuple<ushort, ushort>>();
+				this.Size     = 1;
+				this.EdgeHash = 0;
 
 				this.Nodes.Add(start.id);
 			}
 
 			public TreePart(TreePart clone)
 			{
-				this.Nodes = new HashSet<ushort>(clone.Nodes);
-				this.Edges = new List<Tuple<ushort, ushort>>(clone.Edges);
-				this.Size  = clone.Size;
+				this.Nodes    = new HashSet<ushort>(clone.Nodes);
+				this.Edges    = new List<Tuple<ushort, ushort>>(clone.Edges);
+				this.Size     = clone.Size;
+				this.EdgeHash = clone.EdgeHash;
+			}
+
+			public bool Equals(TreePart other)
+			{
+				if (this.EdgeHash != other.EdgeHash)
+					return false;
+				if (this.Size != other.Size)
+					return false;
+				return true;
+			}
+
+			public override bool Equals(object obj)
+			{
+				if (obj is TreePart)
+					return Equals(obj as TreePart);
+				return false;
+			}
+
+			public override int GetHashCode()
+			{
+				return this.EdgeHash;
 			}
 
 			public int Size;
 			public List<Tuple<ushort, ushort>> Edges;
 			public HashSet<ushort> Nodes;
+			public int EdgeHash;
 		}
 
+		public static int collisions = 0;
+
 		public class TreeGroup
+			: IEquatable<TreeGroup>
 		{
 			public TreeGroup(TreePart a, TreePart[] b)
 			{
 				this.Parts = new TreePart[b.Length];
 				this.Smallest = a;
+				this.PartHash = a.EdgeHash;
 
 				this.Size = a.Size;
 				int index = 0;
 				for (int i = 0; i < b.Length; ++i) {
 					this.Size += b[i].Size;
+					this.PartHash += b[i].EdgeHash;
 					if (b[i].Size < Smallest.Size) {
 						this.Parts[index++] = Smallest;
 						this.Smallest = b[i];
@@ -270,9 +305,11 @@ namespace POESKillTree
 				this.Smallest = a[0];
 
 				this.Size = a[0].Size;
+				this.PartHash = a[0].EdgeHash;
 				int index = 0;
 				for (int i = 1; i < a.Length; ++i) {
 					this.Size += a[i].Size;
+					this.PartHash += a[i].EdgeHash;
 					if (a[i].Size < Smallest.Size) {
 						this.Parts[index++] = Smallest;
 						this.Smallest = a[i];
@@ -290,14 +327,56 @@ namespace POESKillTree
 				return null;
 			}
 
+			public override int GetHashCode()
+			{
+				return this.PartHash;
+			}
+
+			public bool Equals(TreeGroup other)
+			{
+				if (this.PartHash != other.PartHash)
+					return false;
+				if (this.Size != other.Size)
+					return false;
+
+				EdgeComparer comparer = new EdgeComparer();
+				HashSet<Tuple<ushort, ushort>> edges = new HashSet<Tuple<ushort, ushort>>(Smallest.Edges, comparer);
+				foreach (TreePart part in Parts)
+					edges.UnionWith(part.Edges);
+
+				foreach (Tuple<ushort, ushort> edge in other.Smallest.Edges)
+					if (!edges.Contains(edge)) {
+						collisions++;
+						return false;
+					}
+				foreach (TreePart part in other.Parts)
+					foreach (Tuple<ushort, ushort> edge in part.Edges)
+						if (!edges.Contains(edge)) {
+							collisions++;
+							return false;
+						}
+
+				return true;
+			}
+
+			public override bool Equals(object obj)
+			{
+				if (obj is TreeGroup)
+					return Equals(obj as TreeGroup);
+				return false;
+			}
+
 			public int Size;
 			public TreePart[] Parts;
 			public TreePart   Smallest;
+			public int PartHash;
 		}
 
 		public List<Tuple<ushort, ushort>> SolveSimpleGraph()
 		{
 			Dictionary<ushort, List<KeyValuePair<ushort, int>>> neighbors = new Dictionary<ushort, List<KeyValuePair<ushort, int>>>();
+			EdgeComparer edgeComparer = new EdgeComparer();
+			HashSet<TreeGroup> treeHash = new HashSet<TreeGroup>(EqualityComparer<TreeGroup>.Default);
 
 			// INITIALIZE
 			foreach (var origin in SimpleGraph) {
@@ -318,15 +397,28 @@ namespace POESKillTree
 			}
 
 			TreeGroup initialGroup = new TreeGroup(initialParts);
+			treeHash.Add(initialGroup);
 
 			groups.Enqueue(initialGroup.Size, initialGroup);
+
+			int maxSize = 0;
+			collisions = 0;
 
 			// DO WORK.
 			while (!groups.IsEmpty) {
 				TreeGroup group = groups.DequeueValue();
 
-				if (group.Parts.Length == 0)
+				if (groups.Count > maxSize) {
+					if ((groups.Count / 100000f) > Math.Ceiling(maxSize / 100000f))
+						Console.WriteLine("Groups: {0} {1} {2}", groups.Count, treeHash.Count, group.Size);
+					maxSize = groups.Count;
+				}
+
+				if (group.Parts.Length == 0) {
+					Console.WriteLine("Max items in queue: {0}", maxSize);
+					Console.WriteLine("Collisions: {0} :{1}", collisions, collisions == 0 ? ")" : "(");
 					return group.Smallest.Edges;
+				}
 
 				TreePart smallest = group.Smallest;
 
@@ -336,12 +428,15 @@ namespace POESKillTree
 							continue;
 
 						TreePart part = new TreePart(smallest);
+						Tuple<ushort, ushort> edge = new Tuple<ushort, ushort>(node, next.Key);
 
 						part.Nodes.Add(next.Key);
-						part.Edges.Add(new Tuple<ushort, ushort>(node, next.Key));
+						part.Edges.Add(edge);
 						part.Size += next.Value;
+						part.EdgeHash += EdgeComparer.Instance.GetHashCode(edge);
 
-						TreePart mergePart = group.Containing(node);
+						TreePart mergePart = group.Containing(next.Key);
+						TreeGroup newGroup;
 						if (mergePart != null) {
 							part.Nodes.UnionWith(mergePart.Nodes);
 							part.Edges.AddRange(mergePart.Edges);
@@ -352,12 +447,15 @@ namespace POESKillTree
 							for (int i = 0; i < group.Parts.Length; ++i)
 								if (group.Parts[i] != mergePart)
 									other[index++] = group.Parts[i];
-							TreeGroup newGroup = new TreeGroup(part, other);
-							groups.Enqueue(newGroup.Size, newGroup);
+							newGroup = new TreeGroup(part, other);
 						} else {
-							TreeGroup newGroup = new TreeGroup(part, group.Parts);
+							newGroup = new TreeGroup(part, group.Parts);
+						}
+
+						if (!treeHash.Contains(newGroup)) {
+							treeHash.Add(newGroup);
 							groups.Enqueue(newGroup.Size, newGroup);
-						}		
+						}
 					}
 				}
 			}
