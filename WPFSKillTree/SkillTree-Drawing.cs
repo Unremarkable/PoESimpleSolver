@@ -67,15 +67,15 @@ namespace POESKillTree
 			}
 		}
 
-		public void DrawSolvePath(Dictionary<SkillNode, HashSet<SkillNode>> edges)
+		public void DrawSolvePath(List<Tuple<ushort, ushort>> edges)
 		{
 			System.Windows.Media.Brush brush = new SolidColorBrush(Color.FromArgb(255, 0, 255, 0));
 			System.Windows.Media.Pen hpen = new System.Windows.Media.Pen(brush, 15f);
 
 			using (DrawingContext dc = picSolvePaths.RenderOpen()) {
-				foreach (var vkp in edges) {
-                    foreach (var vlp in vkp.Value) {
-                        dc.DrawLine(hpen, vkp.Key.Position, vlp.Position);
+				foreach (var edge in edges) {
+                    foreach (var tuple in edges) {
+                        dc.DrawLine(hpen, Skillnodes[tuple.Item1].Position, Skillnodes[tuple.Item2].Position);
                     }
 				}
 			}

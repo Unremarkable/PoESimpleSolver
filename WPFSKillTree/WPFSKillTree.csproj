@@ -127,6 +127,7 @@
     <Compile Include="SkillTree-Drawing.cs" />
     <Compile Include="SkillTree.cs" />
     <Compile Include="SkillTreeImporter.cs" />
+    <Compile Include="Utility\PriorityQueue.cs" />
     <Compile Include="Vector2D.cs" />
     <Compile Include="FormChooseBuildName.xaml.cs">
       <DependentUpon>FormChooseBuildName.xaml</DependentUpon>

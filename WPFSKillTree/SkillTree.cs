@@ -12,6 +12,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Diagnostics;
 using Newtonsoft.Json;
+using System.Collections;
+using POESKillTree.Utility;
 
 namespace POESKillTree
 {
@@ -117,85 +119,267 @@ namespace POESKillTree
 			}
 
 			return solution;*/
-		}   
+		}
 
-		private Dictionary<SkillNode, HashSet<SkillNode>> SolveSimpleGraph()
+		private interface IPrioritizer<T>
 		{
-            SortedSet<SubTree> spanningTrees = new SortedSet<SubTree>(new SubTreeComparer());
+			int PriorityOf(T t);
+		}
+
+		private class PriorityMap<T>
+		{
+			public PriorityMap(IPrioritizer<T> p)
+			{
+				_Priority = new PriorityQueue<int, T>();
+				_Data = new HashSet<T>();
+				_Prioritizer = p;
+			}
+
+			public bool Enqueue(T t)
+			{
+				if (_Data.Add(t)) {
+					_Priority.Enqueue(_Prioritizer.PriorityOf(t), t);
+				}
+				return false;
+			}
+
+			public T Dequeue()
+			{
+				T t = _Priority.DequeueValue();
+				_Data.Remove(t);
+				return t;
+			}
+
+			private PriorityQueue<int, T> _Priority;
+			private HashSet<T> _Data;
+			private IPrioritizer<T> _Prioritizer;
+		}
+
+	/*	private Dictionary<SkillNode, HashSet<SkillNode>> SolveSimpleGraph()
+		{
+			PriorityMap<SubTree> spanningTrees = new PriorityMap<SubTree>(SubTree.Prioritizer);
             SkillNode rootNode = SolveSet.First();
+
             foreach (var asdf in SimpleGraph[rootNode])
             {
                 HashSet<Tuple<ushort,ushort>> newEdges = new HashSet<Tuple<ushort,ushort>>();
                 Tuple<ushort, ushort> newEdge = new Tuple<ushort, ushort>(rootNode.id, asdf.Key.id);
                 newEdges.Add(newEdge);
-                spanningTrees.Add(new SubTree(newEdges, asdf.Value));
+                spanningTrees.Enqueue(new SubTree(newEdges, asdf.Value));
             }
 
             int writecount = 0;
-            
+
+			IEnumerable<ushort> solveSetIDs = SolveSet.Select(node => node.id);
+
             while(true){
-                SubTree smallestSubtree = spanningTrees.First();
-                
-                if (smallestSubtree.getNodeIds().IsSupersetOf(SolveSet.Select(node => node.id))){
+				SubTree smallestSubtree = spanningTrees.Dequeue();
+
+				if (smallestSubtree.getNodeIds().IsSupersetOf(solveSetIDs)) {
                     Dictionary<SkillNode, HashSet<SkillNode>> solution = new Dictionary<SkillNode, HashSet<SkillNode>>();
                     foreach (Tuple<ushort, ushort> edge in smallestSubtree.edges){
-                        if (!solution.ContainsKey(Skillnodes[edge.Item1])) solution[Skillnodes[edge.Item1]] = new HashSet<SkillNode>();
+                        if (!solution.ContainsKey(Skillnodes[edge.Item1]))
+							solution[Skillnodes[edge.Item1]] = new HashSet<SkillNode>();
                         solution[Skillnodes[edge.Item1]].Add(Skillnodes[edge.Item2]);
-                        Console.Out.WriteLine(edge.Item1 + " " + edge.Item2 + " ");
                     }
-                    Console.Out.WriteLine(spanningTrees.Count);
 
                     return solution;
                 }
+
                 writecount++;
                 if (writecount > 20000)
                 {
                     Console.Out.WriteLine(smallestSubtree.edges.Count + " " + smallestSubtree.size);
                     writecount = 0;
                 }
-               
 
-
-                foreach (Tuple<ushort, ushort> edge in smallestSubtree.edges)
-                {
+                foreach (Tuple<ushort, ushort> edge in smallestSubtree.edges) {
                     SkillNode node = Skillnodes[edge.Item2];
                     foreach ( var neighbor in SimpleGraph[node]){
-                        if( smallestSubtree.getNodeIds().Contains(neighbor.Key.id)) { continue; }
+						if (smallestSubtree.getNodeIds().Contains(neighbor.Key.id)) { continue; }
 
                         HashSet<Tuple<ushort, ushort>> newEdges = new HashSet<Tuple<ushort, ushort>>(smallestSubtree.edges);
                         Tuple<ushort, ushort> newEdge = new Tuple<ushort, ushort>(node.id, neighbor.Key.id);
                         newEdges.Add(newEdge);
-                        spanningTrees.Add(new SubTree(newEdges, smallestSubtree.size + neighbor.Value));
+                        spanningTrees.Enqueue(new SubTree(newEdges, smallestSubtree.size + neighbor.Value));
                     }
                 }
-
-                spanningTrees.Remove(smallestSubtree);
             }
+		}*/
 
-            return null;
+		public class TupleComparer<T> : IEqualityComparer<Tuple<T, T>>
+		{
+			bool IEqualityComparer<Tuple<T,T>>.Equals(Tuple<T,T> x, Tuple<T,T> y)
+			{
+				return (x.Item1.Equals(y.Item1) && x.Item2.Equals(y.Item2))
+					|| (x.Item1.Equals(y.Item2) && x.Item2.Equals(y.Item2));
+			}
+
+			int IEqualityComparer<Tuple<T,T>>.GetHashCode(Tuple<T,T> obj)
+			{
+				return obj.Item1.GetHashCode() ^ obj.Item2.GetHashCode();
+			}
 		}
 
-        private class SubTreeComparer : IComparer<SubTree>
-        {
-            public int Compare(SubTree x, SubTree y)
-            {
-                if (x.size > y.size) {
-                    return 1;
-                }
-                else if (y.size > x.size)
-                {
-                    return -1;
-                }
-                else
-                {
-                    return x.GetHashCode() - y.GetHashCode();
-                }
-            }
-        }
+		public class TreePart
+		{
+			public TreePart(SkillNode start)
+			{
+				this.Nodes = new HashSet<ushort>();
+				this.Edges = new List<Tuple<ushort, ushort>>();
+				this.Size  = 1;
 
-        private class SubTree : IComparable<SubTree>
+				this.Nodes.Add(start.id);
+			}
+
+			public TreePart(TreePart clone)
+			{
+				this.Nodes = new HashSet<ushort>(clone.Nodes);
+				this.Edges = new List<Tuple<ushort, ushort>>(clone.Edges);
+				this.Size  = clone.Size;
+			}
+
+			public int Size;
+			public List<Tuple<ushort, ushort>> Edges;
+			public HashSet<ushort> Nodes;
+		}
+
+		public class TreeGroup
+		{
+			public TreeGroup(TreePart a, TreePart[] b)
+			{
+				this.Parts = new TreePart[b.Length];
+				this.Smallest = a;
+
+				this.Size = a.Size;
+				int index = 0;
+				for (int i = 0; i < b.Length; ++i) {
+					this.Size += b[i].Size;
+					if (b[i].Size < Smallest.Size) {
+						this.Parts[index++] = Smallest;
+						this.Smallest = b[i];
+					} else {
+						this.Parts[index++] = b[i];
+					}
+				}
+			}
+
+			public TreeGroup(TreePart[] a)
+			{
+				this.Parts = new TreePart[a.Length - 1];
+				this.Smallest = a[0];
+
+				this.Size = a[0].Size;
+				int index = 0;
+				for (int i = 1; i < a.Length; ++i) {
+					this.Size += a[i].Size;
+					if (a[i].Size < Smallest.Size) {
+						this.Parts[index++] = Smallest;
+						this.Smallest = a[i];
+					} else {
+						this.Parts[index++] = a[i];
+					}
+				}
+			}
+
+			public TreePart Containing(ushort node)
+			{
+				foreach (TreePart part in Parts)
+					if (part.Nodes.Contains(node))
+						return part;
+				return null;
+			}
+
+			public int Size;
+			public TreePart[] Parts;
+			public TreePart   Smallest;
+		}
+
+		public List<Tuple<ushort, ushort>> SolveSimpleGraph()
+		{
+			Dictionary<ushort, List<KeyValuePair<ushort, int>>> neighbors = new Dictionary<ushort, List<KeyValuePair<ushort, int>>>();
+
+			// INITIALIZE
+			foreach (var origin in SimpleGraph) {
+				neighbors[origin.Key.id] = new List<KeyValuePair<ushort, int>>();
+				foreach (var destination in origin.Value) {
+					neighbors[origin.Key.id].Add(new KeyValuePair<ushort, int>(destination.Key.id, destination.Value));
+				}
+			}
+
+			PriorityQueue<int, TreeGroup> groups = new PriorityQueue<int, TreeGroup>();
+
+			TreePart[] initialParts = new TreePart[SolveSet.Count];
+			{
+				int index = 0;
+				foreach (SkillNode node in SolveSet) {
+					initialParts[index++] = new TreePart(node);
+				}
+			}
+
+			TreeGroup initialGroup = new TreeGroup(initialParts);
+
+			groups.Enqueue(initialGroup.Size, initialGroup);
+
+			// DO WORK.
+			while (!groups.IsEmpty) {
+				TreeGroup group = groups.DequeueValue();
+
+				if (group.Parts.Length == 0)
+					return group.Smallest.Edges;
+
+				TreePart smallest = group.Smallest;
+
+				foreach (ushort node in smallest.Nodes) {
+					foreach (var next in neighbors[node]) {
+						if (smallest.Nodes.Contains(next.Key))
+							continue;
+
+						TreePart part = new TreePart(smallest);
+
+						part.Nodes.Add(next.Key);
+						part.Edges.Add(new Tuple<ushort, ushort>(node, next.Key));
+						part.Size += next.Value;
+
+						TreePart mergePart = group.Containing(node);
+						if (mergePart != null) {
+							part.Nodes.UnionWith(mergePart.Nodes);
+							part.Edges.AddRange(mergePart.Edges);
+							part.Size += mergePart.Size - 1;
+
+							TreePart[] other = new TreePart[group.Parts.Length - 1];
+							int index = 0;
+							for (int i = 0; i < group.Parts.Length; ++i)
+								if (group.Parts[i] != mergePart)
+									other[index++] = group.Parts[i];
+							TreeGroup newGroup = new TreeGroup(part, other);
+							groups.Enqueue(newGroup.Size, newGroup);
+						} else {
+							TreeGroup newGroup = new TreeGroup(part, group.Parts);
+							groups.Enqueue(newGroup.Size, newGroup);
+						}		
+					}
+				}
+			}
+
+			return null;
+		}
+
+		/*
+        private class SubTree : IComparable<SubTree>, IEquatable<SubTree>
         {
-            public HashSet<Tuple<ushort, ushort>> edges;
+			private class Prioritizer : IPrioritizer<SubTree>
+			{
+				int IPrioritizer<SubTree>.PriorityOf(SubTree t)
+				{
+					return t.size;
+				}
+			}
+
+			public static IPrioritizer<SubTree> Prioritizer = new Prioritizer();
+
+      //    public HashSet<Tuple<ushort, ushort>> edges;
+
             HashSet<ushort> nodes;
             public int size;
             private int hashCode;
@@ -206,22 +390,37 @@ namespace POESKillTree
                 this.size = size;
             }
 
-            public override bool Equals(object obj)
-            {
-                SubTree other = obj as SubTree;
-                if (other.edges.Count != this.edges.Count)
-                    return false;
+			public bool Equals(SubTree other)
+			{
+				if (other.GetHashCode() != this.GetHashCode())
+					return false;
+				if (other.edges.Count != this.edges.Count)
+					return false;
+			//	foreach (Tuple<ushort, ushort> edge in edges) {
+			//		if (!other.edges.Contains(edge))
+			//			return false;
+			//	}
+				return true;
+			}
 
-                foreach (Tuple<ushort, ushort> edge in edges) {
-                    if (!other.edges.Contains(edge))
-                        return false;
-                }
-                return true;
+            public override bool Equals(object other)
+            {
+				if (other is SubTree)
+					return (this as IEquatable<SubTree>).Equals(other as SubTree);
+				return false;
             }
 
             public int CompareTo(SubTree other)
-            {
-                return this.size - other.size;
+			{
+				if (this.Equals(other))
+					return  0;
+				if (this.size > other.size)
+					return  1;
+				if (this.size < other.size)
+					return -1;
+				if (this.GetHashCode() > other.GetHashCode())
+					return  1;
+				return -1;
             }
 
             public HashSet<ushort> getNodeIds() {
@@ -244,7 +443,7 @@ namespace POESKillTree
 
                 return hashCode;
             }
-        }
+		}*/
 
 		public void Solve()
 		{
@@ -544,7 +743,7 @@ namespace POESKillTree
 				}
 			}
 
-			while (Simplify()) ;
+			while (Simplify()) ;	// good coding practices.
 
 			Console.WriteLine("[Core Nodes] {0}", SimpleGraph.Count);
 			Console.WriteLine("[Edges] {0}", SimpleGraph.Sum(dict => dict.Value.Count));
