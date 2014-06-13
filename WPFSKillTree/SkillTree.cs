@@ -441,6 +441,7 @@ namespace POESKillTree
 							part.Nodes.UnionWith(mergePart.Nodes);
 							part.Edges.AddRange(mergePart.Edges);
 							part.Size += mergePart.Size - 1;
+							part.EdgeHash += mergePart.EdgeHash;
 
 							TreePart[] other = new TreePart[group.Parts.Length - 1];
 							int index = 0;
