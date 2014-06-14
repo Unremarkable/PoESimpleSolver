@@ -645,7 +645,6 @@ namespace POESKillTree
 							best = diff;
 					}
 
-					//						if (!SolveSet.Any(ep => ShortestPathTable[node][ep].First().Value > ShortestPathTable[neighbor][ep].First().Value + SimpleGraph[node][neighbor])) {
 					if (best > 0) {
 						SimpleGraph[node].Remove(neighbor);
 						SimpleGraph[neighbor].Remove(node);
@@ -656,14 +655,12 @@ namespace POESKillTree
 
 			// MST test
 			foreach (SkillNode node in SimpleGraph.Keys) {
-				if (SolveSet.Contains(node)/* || SkilledNodes.Contains(node.id)*/)
+				if (SolveSet.Contains(node))
 					continue;
 
 				int max = SimpleGraph[node].Sum(kvp => kvp.Value) + 1;
 
 				List<List<Tuple<ushort, ushort>>> msts = SolveSimpleGraph(SimpleGraph[node].Keys, max);
-
-				Console.WriteLine("Test: {0}", msts.Count);
 
 				for (var i = 0; i < msts.Count; ++i) {
 					bool contains = false;
@@ -674,7 +671,6 @@ namespace POESKillTree
 						break;
 					}
 					if (!contains) {
-						Console.WriteLine("I'm doing work!");
 						foreach (SkillNode next in SimpleGraph[node].Keys)
 							SimpleGraph[next].Remove(node);
 						SimpleGraph.Remove(node);
