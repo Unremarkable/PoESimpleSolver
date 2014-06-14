@@ -78,14 +78,33 @@ namespace POESKillTree
 			Color.FromRgb(0x00, 0xE0, 0x00), Color.FromRgb(0x00, 0x00, 0xE0), Color.FromRgb(0xE0, 0xE0, 0x00), Color.FromRgb(0xE0, 0x00, 0xE0), Color.FromRgb(0x00, 0xE0, 0xE0), Color.FromRgb(0xE0, 0xE0, 0xE0), 
 		};
 
+		private void FollowPathBetween(DrawingContext dc, Pen pen, SkillNode from, SkillNode goal)
+		{
+			HashSet<SkillNode> front = new HashSet<SkillNode>();
+			front.Add(from);
+			while (front.Count > 0) {
+				HashSet<SkillNode> newFront = new HashSet<SkillNode>();
+				foreach (SkillNode next in front) {
+					foreach (SkillNode to in ShortestPathTable[next][goal].Item1) {
+						DrawConnection(dc, pen, next, to);
+						if (to != goal)
+							newFront.Add(to);
+					}
+				}
+				front = newFront;
+			}
+		}
+
 		public void DrawSolvePath(List<List<Tuple<ushort, ushort>>> edgesList)
 		{
 			Dictionary<Tuple<ushort, ushort>, List<int>> edgeMap = new Dictionary<Tuple<ushort, ushort>, List<int>>(new EdgeComparer());
 
-			Brush[] brushes = new Brush[edgesList.Count];
+			Brush trunkBrush = new SolidColorBrush(Colors[0]);
+			Pen trunkPen = new Pen(trunkBrush, 15f);
 
+			Brush[] brushes = new Brush[edgesList.Count];
 			for (int i = 0; i < edgesList.Count; ++i) {
-				brushes[i] = new SolidColorBrush(Colors[i]);
+				brushes[i] = new SolidColorBrush(Colors[i + 1]);
 			}
 
 			using (DrawingContext dc = picSolvePaths.RenderOpen()) {
@@ -98,27 +117,17 @@ namespace POESKillTree
 				}
 
 				foreach (var edge in edgeMap) {
-					for (int j = 0; j < edge.Value.Count; ++j) {
-						int i = edge.Value[j];
-						Pen pen = new Pen(brushes[i], 15f);
-						pen.DashStyle = new DashStyle(new DoubleCollection() { 1, edge.Value.Count - 1 }, j);
-						pen.DashCap = PenLineCap.Flat;
-					//	dc.DrawLine(pen, Skillnodes[edge.Key.Item1].Position, Skillnodes[edge.Key.Item2].Position);
-
-						SkillNode goal = Skillnodes[edge.Key.Item2];
-						HashSet<SkillNode> from = new HashSet<SkillNode>();
-						from.Add(Skillnodes[edge.Key.Item1]);
-						while (from.Count > 0) {
-							HashSet<SkillNode> newOrigin = new HashSet<SkillNode>();
-							foreach (SkillNode next in from) {
-								foreach (SkillNode to in ShortestPathTable[next][goal].Item1) {
-									DrawConnection(dc, pen, next, to);
-									if (to != goal)
-										newOrigin.Add(to);
-								}
-							}
-							from = newOrigin;
+					if (edge.Value.Count != edgesList.Count) {
+						for (int j = 0; j < edge.Value.Count; ++j) {
+							int i = edge.Value[j];
+							Pen pen = new Pen(brushes[i], 15f);
+							pen.DashStyle = new DashStyle(new DoubleCollection() { 1, edge.Value.Count - 1 }, j);
+							pen.DashCap = PenLineCap.Flat;
+							//	dc.DrawLine(pen, Skillnodes[edge.Key.Item1].Position, Skillnodes[edge.Key.Item2].Position);
+							FollowPathBetween(dc, pen, Skillnodes[edge.Key.Item1], Skillnodes[edge.Key.Item2]);
 						}
+					} else {
+						FollowPathBetween(dc, trunkPen, Skillnodes[edge.Key.Item1], Skillnodes[edge.Key.Item2]);
 					}
 				}
 			/*	for (int i = 0; i < edgesList.Count; ++i) {

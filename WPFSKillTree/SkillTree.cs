@@ -424,7 +424,7 @@ namespace POESKillTree
 		{
 			DrawSolveHalo(SolveSet);
 
-			if (SolveSet.Count > 1) {
+		//	if (SolveSet.Count > 1) {
 				RecalculateExternal();
 				ConstructSimpleGraph();
 				DrawSimpleGraph(SimpleGraph);
@@ -436,12 +436,12 @@ namespace POESKillTree
 				Console.WriteLine("Elapsed time: {0}", timer.Elapsed);
 
 				DrawSolvePath(solutions);
-			} else {
-				SimpleGraph.Clear();
-				DrawSimpleGraph(SimpleGraph);
-			}
+		//	} else {
+		//		SimpleGraph.Clear();
+		//		DrawSimpleGraph(SimpleGraph);
+		//	}
 			
-			DrawLinkBackgroundLayer();
+		//	DrawLinkBackgroundLayer();
 		}
 
 		public void ToggleToSolve(SkillNode node)
