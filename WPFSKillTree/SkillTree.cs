@@ -454,17 +454,16 @@ namespace POESKillTree
 			Solve();
 		}
 
-		Dictionary<SkillNode, Dictionary<SkillNode, Dictionary<SkillNode, int>>> ShortestPathTable = new Dictionary<SkillNode, Dictionary<SkillNode, Dictionary<SkillNode, int>>>();
+		Dictionary<SkillNode, Dictionary<SkillNode, Tuple<HashSet<SkillNode>, int>>> ShortestPathTable = new Dictionary<SkillNode, Dictionary<SkillNode, Tuple<HashSet<SkillNode>, int>>>();
 
 		public void CalculateAllShortestPaths()
 		{
 			foreach (var skillNode in Skillnodes.Values) {
-				ShortestPathTable[skillNode] = new Dictionary<SkillNode, Dictionary<SkillNode, int>>();
-				ShortestPathTable[skillNode][skillNode] = new Dictionary<SkillNode, int>();
-				ShortestPathTable[skillNode][skillNode].Add(skillNode, 0);
+				ShortestPathTable[skillNode] = new Dictionary<SkillNode, Tuple<HashSet<SkillNode>, int>>();
+				ShortestPathTable[skillNode][skillNode] = new Tuple<HashSet<SkillNode>, int>(new HashSet<SkillNode>(), 0);
 				foreach (var neighbor in skillNode.Neighbor) {
-					ShortestPathTable[skillNode][neighbor] = new Dictionary<SkillNode, int>();
-					ShortestPathTable[skillNode][neighbor].Add(neighbor, 1);
+					ShortestPathTable[skillNode][neighbor] = new Tuple<HashSet<SkillNode>, int>(new HashSet<SkillNode>(), 1);
+					ShortestPathTable[skillNode][neighbor].Item1.Add(neighbor);
 				}
 			}
 
@@ -479,12 +478,9 @@ namespace POESKillTree
 						foreach (var neighbor in frontierNode.Neighbor) {
 							if (!visited.Contains(neighbor) && !frontier.Contains(neighbor)) {
 								newFrontier.Add(neighbor);
-								if (!ShortestPathTable[originNode].ContainsKey(neighbor)) { 
-									ShortestPathTable[originNode][neighbor] = new Dictionary<SkillNode, int>();
-								}
-								foreach (var kv in ShortestPathTable[originNode][frontierNode])
-									ShortestPathTable[originNode][neighbor][kv.Key] = kv.Value + 1;
-//								ShortestPathTable[originNode][neighbor].UnionWith(ShortestPathTable[originNode][frontierNode]);
+								if (!ShortestPathTable[originNode].ContainsKey(neighbor))
+									ShortestPathTable[originNode][neighbor] = new Tuple<HashSet<SkillNode>, int>(new HashSet<SkillNode>(), ShortestPathTable[originNode][frontierNode].Item2 + 1);
+								ShortestPathTable[originNode][neighbor].Item1.UnionWith(ShortestPathTable[originNode][frontierNode].Item1);
 							}
 						}
 					}
@@ -503,9 +499,9 @@ namespace POESKillTree
 
 			currentSet.Add(from);
 
-			foreach (var pathStart in ShortestPathTable[from][to]) {
-				if (!currentSet.Contains(pathStart.Key)) {
-					GetShortestPathNodes(pathStart.Key, to, currentSet);
+			foreach (SkillNode pathStart in ShortestPathTable[from][to].Item1) {
+				if (!currentSet.Contains(pathStart)) {
+					GetShortestPathNodes(pathStart, to, currentSet);
 				}
 			}
 		}
@@ -637,8 +633,8 @@ namespace POESKillTree
 				foreach (var neighbor in SimpleGraph[node].Keys) {
 					int best = 0x7ffffff;
 					foreach (SkillNode ep in SolveSet) {
-						int myDist = ShortestPathTable[node][ep].First().Value;
-						int itDist = ShortestPathTable[neighbor][ep].First().Value;
+						int myDist = ShortestPathTable[node][ep].Item2;
+						int itDist = ShortestPathTable[neighbor][ep].Item2;
 						int cost = SimpleGraph[node][neighbor];
 						int diff = (itDist + cost) - myDist;
 						if (diff < best)

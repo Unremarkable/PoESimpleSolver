@@ -103,7 +103,22 @@ namespace POESKillTree
 						Pen pen = new Pen(brushes[i], 15f);
 						pen.DashStyle = new DashStyle(new DoubleCollection() { 1, edge.Value.Count - 1 }, j);
 						pen.DashCap = PenLineCap.Flat;
-						dc.DrawLine(pen, Skillnodes[edge.Key.Item1].Position, Skillnodes[edge.Key.Item2].Position);
+					//	dc.DrawLine(pen, Skillnodes[edge.Key.Item1].Position, Skillnodes[edge.Key.Item2].Position);
+
+						SkillNode goal = Skillnodes[edge.Key.Item2];
+						HashSet<SkillNode> from = new HashSet<SkillNode>();
+						from.Add(Skillnodes[edge.Key.Item1]);
+						while (from.Count > 0) {
+							HashSet<SkillNode> newOrigin = new HashSet<SkillNode>();
+							foreach (SkillNode next in from) {
+								foreach (SkillNode to in ShortestPathTable[next][goal].Item1) {
+									DrawConnection(dc, pen, next, to);
+									if (to != goal)
+										newOrigin.Add(to);
+								}
+							}
+							from = newOrigin;
+						}
 					}
 				}
 			/*	for (int i = 0; i < edgesList.Count; ++i) {
