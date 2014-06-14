@@ -67,16 +67,17 @@ namespace POESKillTree
 			}
 		}
 
-		public void DrawSolvePath(List<Tuple<ushort, ushort>> edges)
+		public void DrawSolvePath(List<List<Tuple<ushort, ushort>>> edgesList)
 		{
-			System.Windows.Media.Brush brush = new SolidColorBrush(Color.FromArgb(255, 0, 255, 0));
-			System.Windows.Media.Pen hpen = new System.Windows.Media.Pen(brush, 15f);
-
 			using (DrawingContext dc = picSolvePaths.RenderOpen()) {
-				foreach (var edge in edges) {
-                    foreach (var tuple in edges) {
-                        dc.DrawLine(hpen, Skillnodes[tuple.Item1].Position, Skillnodes[tuple.Item2].Position);
-                    }
+				for (int i = 0; i < edgesList.Count; ++i) {
+					System.Windows.Media.Brush brush = new SolidColorBrush(Color.FromArgb(255, 0, 255, (byte)((255 * (i + 1)) / edgesList.Count)));
+					System.Windows.Media.Pen hpen = new System.Windows.Media.Pen(brush, 15f);
+					hpen.DashCap = PenLineCap.Flat;
+					hpen.DashStyle = new DashStyle(new DoubleCollection() { 1, edgesList.Count - 1 }, hpen.Thickness * (i) / edgesList.Count);
+					foreach (var tuple in edgesList[i]) {
+						dc.DrawLine(hpen, Skillnodes[tuple.Item1].Position, Skillnodes[tuple.Item2].Position);
+					}
 				}
 			}
 		}

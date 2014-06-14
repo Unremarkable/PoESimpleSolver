@@ -81,132 +81,6 @@ namespace POESKillTree
 
 		HashSet<SkillNode> SolveSet = new HashSet<SkillNode>();
 
-		private Dictionary<SkillNode, SkillNode> FindGraphOfSize(Dictionary<SkillNode, SkillNode> solution, HashSet<SkillNode> graph, int remaining)
-		{
-			if (graph.IsSupersetOf(SolveSet))
-				return solution;
-
-			foreach (SkillNode node in graph) {
-				foreach (SkillNode next in SimpleGraph[node].Keys) {
-					if (!graph.Contains(next) && SimpleGraph[node][next] <= remaining) {
-						HashSet<SkillNode> newGraph = new HashSet<SkillNode>(graph);
-						newGraph.Add(next);
-						solution.Add(next, node);
-						
-						var result = FindGraphOfSize(solution, newGraph, remaining - SimpleGraph[node][next]);
-						if (result != null && result.Count > 0)
-							return result;
-
-						solution.Remove(next);
-					}
-				}
-			}
-
-			return null;
-			
-			/*
-			if (graph.IsSupersetOf(SolveSet))
-				return solution;
-
-			foreach (SkillNode node in graph) {
-				foreach (SkillNode next in SimpleGraph[node].Keys) {
-					if (!graph.Contains(next) && SimpleGraph[node][next] <= remaining) {
-						HashSet<SkillNode> newGraph = new HashSet<SkillNode>(graph);
-						newGraph.Add(next);
-						solution.UnionWith(FindGraphOfSize(solution, newGraph, remaining - SimpleGraph[node][next]));
-					}
-				}
-			}
-
-			return solution;*/
-		}
-
-		private interface IPrioritizer<T>
-		{
-			int PriorityOf(T t);
-		}
-
-		private class PriorityMap<T>
-		{
-			public PriorityMap(IPrioritizer<T> p)
-			{
-				_Priority = new PriorityQueue<int, T>();
-				_Data = new HashSet<T>();
-				_Prioritizer = p;
-			}
-
-			public bool Enqueue(T t)
-			{
-				if (_Data.Add(t)) {
-					_Priority.Enqueue(_Prioritizer.PriorityOf(t), t);
-				}
-				return false;
-			}
-
-			public T Dequeue()
-			{
-				T t = _Priority.DequeueValue();
-				_Data.Remove(t);
-				return t;
-			}
-
-			private PriorityQueue<int, T> _Priority;
-			private HashSet<T> _Data;
-			private IPrioritizer<T> _Prioritizer;
-		}
-
-	/*	private Dictionary<SkillNode, HashSet<SkillNode>> SolveSimpleGraph()
-		{
-			PriorityMap<SubTree> spanningTrees = new PriorityMap<SubTree>(SubTree.Prioritizer);
-            SkillNode rootNode = SolveSet.First();
-
-            foreach (var asdf in SimpleGraph[rootNode])
-            {
-                HashSet<Tuple<ushort,ushort>> newEdges = new HashSet<Tuple<ushort,ushort>>();
-                Tuple<ushort, ushort> newEdge = new Tuple<ushort, ushort>(rootNode.id, asdf.Key.id);
-                newEdges.Add(newEdge);
-                spanningTrees.Enqueue(new SubTree(newEdges, asdf.Value));
-            }
-
-            int writecount = 0;
-
-			IEnumerable<ushort> solveSetIDs = SolveSet.Select(node => node.id);
-
-            while(true){
-				SubTree smallestSubtree = spanningTrees.Dequeue();
-
-				if (smallestSubtree.getNodeIds().IsSupersetOf(solveSetIDs)) {
-                    Dictionary<SkillNode, HashSet<SkillNode>> solution = new Dictionary<SkillNode, HashSet<SkillNode>>();
-                    foreach (Tuple<ushort, ushort> edge in smallestSubtree.edges){
-                        if (!solution.ContainsKey(Skillnodes[edge.Item1]))
-							solution[Skillnodes[edge.Item1]] = new HashSet<SkillNode>();
-                        solution[Skillnodes[edge.Item1]].Add(Skillnodes[edge.Item2]);
-                    }
-
-                    return solution;
-                }
-
-                writecount++;
-                if (writecount > 20000)
-                {
-                    Console.Out.WriteLine(smallestSubtree.edges.Count + " " + smallestSubtree.size);
-                    writecount = 0;
-                }
-
-                foreach (Tuple<ushort, ushort> edge in smallestSubtree.edges) {
-                    SkillNode node = Skillnodes[edge.Item2];
-                    foreach ( var neighbor in SimpleGraph[node]){
-						if (smallestSubtree.getNodeIds().Contains(neighbor.Key.id)) { continue; }
-
-                        HashSet<Tuple<ushort, ushort>> newEdges = new HashSet<Tuple<ushort, ushort>>(smallestSubtree.edges);
-                        Tuple<ushort, ushort> newEdge = new Tuple<ushort, ushort>(node.id, neighbor.Key.id);
-                        newEdges.Add(newEdge);
-                        spanningTrees.Enqueue(new SubTree(newEdges, smallestSubtree.size + neighbor.Value));
-                    }
-                }
-            }
-		}*/
-
 		public class EdgeComparer : IEqualityComparer<Tuple<ushort, ushort>>
 		{
 			public static EdgeComparer Instance = new EdgeComparer();
@@ -372,7 +246,7 @@ namespace POESKillTree
 			public int PartHash;
 		}
 
-		public List<Tuple<ushort, ushort>> SolveSimpleGraph()
+		public List<List<Tuple<ushort, ushort>>> SolveSimpleGraph(IEnumerable<SkillNode> solveSet, int maxSize)
 		{
 			Dictionary<ushort, List<KeyValuePair<ushort, int>>> neighbors = new Dictionary<ushort, List<KeyValuePair<ushort, int>>>();
 			EdgeComparer edgeComparer = new EdgeComparer();
@@ -388,36 +262,35 @@ namespace POESKillTree
 
 			PriorityQueue<int, TreeGroup> groups = new PriorityQueue<int, TreeGroup>();
 
-			TreePart[] initialParts = new TreePart[SolveSet.Count];
+			List<TreePart> initialParts = new List<TreePart>();
 			{
-				int index = 0;
-				foreach (SkillNode node in SolveSet) {
-					initialParts[index++] = new TreePart(node);
+				foreach (SkillNode node in solveSet) {
+					initialParts.Add(new TreePart(node));
 				}
 			}
 
-			TreeGroup initialGroup = new TreeGroup(initialParts);
+			TreeGroup initialGroup = new TreeGroup(initialParts.ToArray());
 			treeHash.Add(initialGroup);
 
 			groups.Enqueue(initialGroup.Size, initialGroup);
 
-			int maxSize = 0;
 			collisions = 0;
+			int generation = 0;
+
+			List<List<Tuple<ushort, ushort>>> solutions = new List<List<Tuple<ushort, ushort>>>();
 
 			// DO WORK.
 			while (!groups.IsEmpty) {
+				generation++;
 				TreeGroup group = groups.DequeueValue();
 
-				if (groups.Count > maxSize) {
-					if ((groups.Count / 100000f) > Math.Ceiling(maxSize / 100000f))
-						Console.WriteLine("Groups: {0} {1} {2}", groups.Count, treeHash.Count, group.Size);
-					maxSize = groups.Count;
-				}
+//				if ((groups.Count / 100000f) > Math.Ceiling(maxSize / 100000f))
+//					Console.WriteLine("[{3}] Groups: {0} {1} {2}", groups.Count, treeHash.Count, group.Size, generation);
 
-				if (group.Parts.Length == 0) {
-					Console.WriteLine("Max items in queue: {0}", maxSize);
-					Console.WriteLine("Collisions: {0} :{1}", collisions, collisions == 0 ? ")" : "(");
-					return group.Smallest.Edges;
+				if (group.Parts.Length == 0 && group.Size <= maxSize) {
+					maxSize = group.Size;
+					solutions.Add(group.Smallest.Edges);
+					continue;
 				}
 
 				TreePart smallest = group.Smallest;
@@ -453,6 +326,9 @@ namespace POESKillTree
 							newGroup = new TreeGroup(part, group.Parts);
 						}
 
+						if (newGroup.Size > maxSize)
+							continue;
+
 						if (!treeHash.Contains(newGroup)) {
 							treeHash.Add(newGroup);
 							groups.Enqueue(newGroup.Size, newGroup);
@@ -461,7 +337,7 @@ namespace POESKillTree
 				}
 			}
 
-			return null;
+			return solutions;
 		}
 
 		/*
@@ -552,7 +428,14 @@ namespace POESKillTree
 				RecalculateExternal();
 				ConstructSimpleGraph();
 				DrawSimpleGraph(SimpleGraph);
-				DrawSolvePath(SolveSimpleGraph());
+
+				Stopwatch timer = Stopwatch.StartNew();
+				var solutions = SolveSimpleGraph(SolveSet, 120);
+				timer.Stop();
+				Console.WriteLine("{0} solutions found!", solutions.Count);
+				Console.WriteLine("Elapsed time: {0}", timer.Elapsed);
+
+				DrawSolvePath(solutions);
 			} else {
 				SimpleGraph.Clear();
 				DrawSimpleGraph(SimpleGraph);
@@ -737,6 +620,7 @@ namespace POESKillTree
 				}
 			}
 
+			// I don't remember what this does?
 			foreach (SkillNode origin in SimpleGraph.Keys) {
 				foreach (SkillNode destination in SimpleGraph[origin].Keys) {
 					int distance = SimpleGraph[origin][destination];
@@ -748,6 +632,7 @@ namespace POESKillTree
 				}
 			}
 
+			// Removes unambiguously worse edges.
 			foreach (SkillNode node in SimpleGraph.Keys) {
 				foreach (var neighbor in SimpleGraph[node].Keys) {
 					int best = 0x7ffffff;
@@ -768,6 +653,36 @@ namespace POESKillTree
 					}
 				}
 			}
+
+			// MST test
+			foreach (SkillNode node in SimpleGraph.Keys) {
+				if (SolveSet.Contains(node)/* || SkilledNodes.Contains(node.id)*/)
+					continue;
+
+				int max = SimpleGraph[node].Sum(kvp => kvp.Value) + 1;
+
+				List<List<Tuple<ushort, ushort>>> msts = SolveSimpleGraph(SimpleGraph[node].Keys, max);
+
+				Console.WriteLine("Test: {0}", msts.Count);
+
+				for (var i = 0; i < msts.Count; ++i) {
+					bool contains = false;
+					for (var j = 0; j < msts[i].Count; ++j) {
+						if (msts[i][j].Item1 != node.id && msts[i][j].Item2 != node.id)
+							continue;
+						contains = true;
+						break;
+					}
+					if (!contains) {
+						Console.WriteLine("I'm doing work!");
+						foreach (SkillNode next in SimpleGraph[node].Keys)
+							SimpleGraph[next].Remove(node);
+						SimpleGraph.Remove(node);
+						return true;
+					}
+				}
+			}
+
 			return false;
 		}
 
