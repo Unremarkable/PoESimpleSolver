@@ -67,10 +67,46 @@ namespace POESKillTree
 			}
 		}
 
+		static Color[] Colors = new Color[] {
+			Color.FromRgb(0x00, 0xFF, 0x00), Color.FromRgb(0x00, 0x00, 0xFF), Color.FromRgb(0xFF, 0xFF, 0x00), Color.FromRgb(0xFF, 0x00, 0xFF), Color.FromRgb(0x00, 0xFF, 0xFF), Color.FromRgb(0x00, 0x00, 0x00), 
+			Color.FromRgb(0x00, 0x80, 0x00), Color.FromRgb(0x00, 0x00, 0x80), Color.FromRgb(0x80, 0x80, 0x00), Color.FromRgb(0x80, 0x00, 0x80), Color.FromRgb(0x00, 0x80, 0x80), Color.FromRgb(0x80, 0x80, 0x80), 
+			Color.FromRgb(0x00, 0xC0, 0x00), Color.FromRgb(0x00, 0x00, 0xC0), Color.FromRgb(0xC0, 0xC0, 0x00), Color.FromRgb(0xC0, 0x00, 0xC0), Color.FromRgb(0x00, 0xC0, 0xC0), Color.FromRgb(0xC0, 0xC0, 0xC0), 
+			Color.FromRgb(0x00, 0x40, 0x00), Color.FromRgb(0x00, 0x00, 0x40), Color.FromRgb(0x40, 0x40, 0x00), Color.FromRgb(0x40, 0x00, 0x40), Color.FromRgb(0x00, 0x40, 0x40), Color.FromRgb(0x40, 0x40, 0x40), 
+			Color.FromRgb(0x00, 0x20, 0x00), Color.FromRgb(0x00, 0x00, 0x20), Color.FromRgb(0x20, 0x20, 0x00), Color.FromRgb(0x20, 0x00, 0x20), Color.FromRgb(0x00, 0x20, 0x20), Color.FromRgb(0x20, 0x20, 0x20), 
+			Color.FromRgb(0x00, 0x60, 0x00), Color.FromRgb(0x00, 0x00, 0x60), Color.FromRgb(0x60, 0x60, 0x00), Color.FromRgb(0x60, 0x00, 0x60), Color.FromRgb(0x00, 0x60, 0x60), Color.FromRgb(0x60, 0x60, 0x60), 
+			Color.FromRgb(0x00, 0xA0, 0x00), Color.FromRgb(0x00, 0x00, 0xA0), Color.FromRgb(0xA0, 0xA0, 0x00), Color.FromRgb(0xA0, 0x00, 0xA0), Color.FromRgb(0x00, 0xA0, 0xA0), Color.FromRgb(0xA0, 0xA0, 0xA0), 
+			Color.FromRgb(0x00, 0xE0, 0x00), Color.FromRgb(0x00, 0x00, 0xE0), Color.FromRgb(0xE0, 0xE0, 0x00), Color.FromRgb(0xE0, 0x00, 0xE0), Color.FromRgb(0x00, 0xE0, 0xE0), Color.FromRgb(0xE0, 0xE0, 0xE0), 
+		};
+
 		public void DrawSolvePath(List<List<Tuple<ushort, ushort>>> edgesList)
 		{
+			Dictionary<Tuple<ushort, ushort>, List<int>> edgeMap = new Dictionary<Tuple<ushort, ushort>, List<int>>(new EdgeComparer());
+
+			Brush[] brushes = new Brush[edgesList.Count];
+
+			for (int i = 0; i < edgesList.Count; ++i) {
+				brushes[i] = new SolidColorBrush(Colors[i]);
+			}
+
 			using (DrawingContext dc = picSolvePaths.RenderOpen()) {
 				for (int i = 0; i < edgesList.Count; ++i) {
+					foreach (var edge in edgesList[i]) {
+						if (!edgeMap.ContainsKey(edge))
+							edgeMap[edge] = new List<int>();
+						edgeMap[edge].Add(i);
+					}
+				}
+
+				foreach (var edge in edgeMap) {
+					for (int j = 0; j < edge.Value.Count; ++j) {
+						int i = edge.Value[j];
+						Pen pen = new Pen(brushes[i], 15f);
+						pen.DashStyle = new DashStyle(new DoubleCollection() { 1, edge.Value.Count - 1 }, j);
+						pen.DashCap = PenLineCap.Flat;
+						dc.DrawLine(pen, Skillnodes[edge.Key.Item1].Position, Skillnodes[edge.Key.Item2].Position);
+					}
+				}
+			/*	for (int i = 0; i < edgesList.Count; ++i) {
 					System.Windows.Media.Brush brush = new SolidColorBrush(Color.FromArgb(255, 0, 255, (byte)((255 * (i + 1)) / edgesList.Count)));
 					System.Windows.Media.Pen hpen = new System.Windows.Media.Pen(brush, 15f);
 					hpen.DashCap = PenLineCap.Flat;
@@ -78,7 +114,7 @@ namespace POESKillTree
 					foreach (var tuple in edgesList[i]) {
 						dc.DrawLine(hpen, Skillnodes[tuple.Item1].Position, Skillnodes[tuple.Item2].Position);
 					}
-				}
+				}*/
 			}
 		}
 
