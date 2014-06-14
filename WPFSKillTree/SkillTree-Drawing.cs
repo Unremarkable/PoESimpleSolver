@@ -100,7 +100,7 @@ namespace POESKillTree
 			Dictionary<Tuple<ushort, ushort>, List<int>> edgeMap = new Dictionary<Tuple<ushort, ushort>, List<int>>(new EdgeComparer());
 
 			Brush trunkBrush = new SolidColorBrush(Colors[0]);
-			Pen trunkPen = new Pen(trunkBrush, 15f);
+			Pen trunkPen = new Pen(trunkBrush, 20f);
 
 			Brush[] brushes = new Brush[edgesList.Count];
 			for (int i = 0; i < edgesList.Count; ++i) {
@@ -117,17 +117,17 @@ namespace POESKillTree
 				}
 
 				foreach (var edge in edgeMap) {
-					if (edge.Value.Count != edgesList.Count) {
+					if (edge.Value.Count == edgesList.Count)
+						FollowPathBetween(dc, trunkPen, Skillnodes[edge.Key.Item1], Skillnodes[edge.Key.Item2]);
+					if (edgesList.Count > 1) {
 						for (int j = 0; j < edge.Value.Count; ++j) {
 							int i = edge.Value[j];
-							Pen pen = new Pen(brushes[i], 15f);
+							Pen pen = new Pen(brushes[i], edge.Value.Count != edgesList.Count ? 20f : 15f);
 							pen.DashStyle = new DashStyle(new DoubleCollection() { 1, edge.Value.Count - 1 }, j);
 							pen.DashCap = PenLineCap.Flat;
 							//	dc.DrawLine(pen, Skillnodes[edge.Key.Item1].Position, Skillnodes[edge.Key.Item2].Position);
 							FollowPathBetween(dc, pen, Skillnodes[edge.Key.Item1], Skillnodes[edge.Key.Item2]);
 						}
-					} else {
-						FollowPathBetween(dc, trunkPen, Skillnodes[edge.Key.Item1], Skillnodes[edge.Key.Item2]);
 					}
 				}
 			/*	for (int i = 0; i < edgesList.Count; ++i) {
