@@ -426,14 +426,18 @@ namespace POESKillTree
 
 		//	if (SolveSet.Count > 1) {
 				RecalculateExternal();
+				Stopwatch simplifyTime = Stopwatch.StartNew();
 				ConstructSimpleGraph();
+				simplifyTime.Stop();
+				Console.WriteLine("Simplify time: {0}", simplifyTime.Elapsed);
+
 				DrawSimpleGraph(SimpleGraph);
 
-				Stopwatch timer = Stopwatch.StartNew();
+				Stopwatch solutionTime = Stopwatch.StartNew();
 				var solutions = SolveSimpleGraph(SolveSet, 120);
-				timer.Stop();
+				solutionTime.Stop();
 				Console.WriteLine("{0} solutions found!", solutions.Count);
-				Console.WriteLine("Elapsed time: {0}", timer.Elapsed);
+				Console.WriteLine("Solve time: {0}", solutionTime.Elapsed);
 
 				DrawSolvePath(solutions);
 		//	} else {
@@ -570,7 +574,63 @@ namespace POESKillTree
             }*/
 		}
 
+		private bool EVERY_MST_CONTAINS(SkillNode node, List<List<Tuple<ushort, ushort>>> msts)
+		{
+			for (var i = 0; i < msts.Count; ++i) {
+				bool contains = false;
+				for (var j = 0; j < msts[i].Count; ++j) {
+					if (msts[i][j].Item1 != node.id && msts[i][j].Item2 != node.id)
+						continue;
+					contains = true;
+					break;
+				}
+				if (!contains)
+					return false;
+			}
+			return true;
+		}
+
+		private bool ANY_MST_OF_NEIGHBORS_INCLUDES(SkillNode node)
+		{
+			List<List<SkillNode>> power = PowerSet(SimpleGraph[node].Keys);
+
+			foreach (List<SkillNode> set in power) {
+				if (set.Count < 2)
+					continue;
+				int max = 0;
+				for (int i = 0; i < set.Count; ++i)
+					max += SimpleGraph[node][set[i]];
+				List<List<Tuple<ushort, ushort>>> msts = SolveSimpleGraph(set, max);
+
+				if (EVERY_MST_CONTAINS(node, msts))
+					return true;
+			}
+
+			return false;
+		}
+
 		Dictionary<SkillNode, Dictionary<SkillNode, int>> SimpleGraph = new Dictionary<SkillNode, Dictionary<SkillNode, int>>();
+
+		private List<List<T>> PowerSet<T>(IEnumerable<T> super)
+		{
+			List<List<T>> sets = new List<List<T>>();
+
+			int i = 1;
+			foreach (T x in super)
+			foreach (T y in super) {
+				int j = 0;
+				List<T> s = new List<T>();
+				foreach (T a in super) {
+					if (((1 << j) & i) != 0)
+						s.Add(a);
+					j++;
+				}
+				sets.Add(s);
+				i++;
+			}
+
+			return sets;
+		}
 
 		private bool Simplify()
 		{
@@ -616,7 +676,24 @@ namespace POESKillTree
 				}
 			}
 
-			// I don't remember what this does?
+			// MST test
+			foreach (SkillNode node in SimpleGraph.Keys) {
+				if (SolveSet.Contains(node))
+					continue;
+
+				if (SimpleGraph[node].Count != 3)
+					continue;
+
+				if (!ANY_MST_OF_NEIGHBORS_INCLUDES(node)) {
+					foreach (SkillNode next in SimpleGraph[node].Keys)
+						SimpleGraph[next].Remove(node);
+					SimpleGraph.Remove(node);
+					return true;
+				}
+			}
+
+			// Prune edges to neighbor if a shorter non-direct path exists.
+			// May be able to swap this with solve simple graph.
 			foreach (SkillNode origin in SimpleGraph.Keys) {
 				foreach (SkillNode destination in SimpleGraph[origin].Keys) {
 					int distance = SimpleGraph[origin][destination];
@@ -628,7 +705,7 @@ namespace POESKillTree
 				}
 			}
 
-			// Removes unambiguously worse edges.
+			// Removes edges that move away from everything.
 			foreach (SkillNode node in SimpleGraph.Keys) {
 				foreach (var neighbor in SimpleGraph[node].Keys) {
 					int best = 0x7ffffff;
@@ -644,32 +721,6 @@ namespace POESKillTree
 					if (best > 0) {
 						SimpleGraph[node].Remove(neighbor);
 						SimpleGraph[neighbor].Remove(node);
-						return true;
-					}
-				}
-			}
-
-			// MST test
-			foreach (SkillNode node in SimpleGraph.Keys) {
-				if (SolveSet.Contains(node))
-					continue;
-
-				int max = SimpleGraph[node].Sum(kvp => kvp.Value) + 1;
-
-				List<List<Tuple<ushort, ushort>>> msts = SolveSimpleGraph(SimpleGraph[node].Keys, max);
-
-				for (var i = 0; i < msts.Count; ++i) {
-					bool contains = false;
-					for (var j = 0; j < msts[i].Count; ++j) {
-						if (msts[i][j].Item1 != node.id && msts[i][j].Item2 != node.id)
-							continue;
-						contains = true;
-						break;
-					}
-					if (!contains) {
-						foreach (SkillNode next in SimpleGraph[node].Keys)
-							SimpleGraph[next].Remove(node);
-						SimpleGraph.Remove(node);
 						return true;
 					}
 				}
