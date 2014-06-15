@@ -284,8 +284,8 @@ namespace POESKillTree
 				generation++;
 				TreeGroup group = groups.DequeueValue();
 
-//				if ((groups.Count / 100000f) > Math.Ceiling(maxSize / 100000f))
-//					Console.WriteLine("[{3}] Groups: {0} {1} {2}", groups.Count, treeHash.Count, group.Size, generation);
+				if (group.Size > maxSize)
+					break;
 
 				if (group.Parts.Length == 0 && group.Size <= maxSize) {
 					maxSize = group.Size;
@@ -592,7 +592,17 @@ namespace POESKillTree
 
 		private bool ANY_MST_OF_NEIGHBORS_INCLUDES(SkillNode node)
 		{
-			List<List<SkillNode>> power = PowerSet(SimpleGraph[node].Keys);
+			HashSet<SkillNode> neighbor_of_neighbor = new HashSet<SkillNode>();
+			foreach (SkillNode neighbor in SimpleGraph[node].Keys)
+				neighbor_of_neighbor.Union(SimpleGraph[neighbor].Keys);
+			neighbor_of_neighbor.Remove(node);
+			foreach (SkillNode neighbor in SimpleGraph[node].Keys)
+				neighbor_of_neighbor.Remove(neighbor);
+
+			List<List<SkillNode>> power = PowerSet(neighbor_of_neighbor);
+
+			if (power.Count == neighbor_of_neighbor.Count)
+				return true;
 
 			foreach (List<SkillNode> set in power) {
 				if (set.Count < 2)
@@ -685,6 +695,7 @@ namespace POESKillTree
 					continue;
 
 				if (!ANY_MST_OF_NEIGHBORS_INCLUDES(node)) {
+					Console.WriteLine("I'm helping!");
 					foreach (SkillNode next in SimpleGraph[node].Keys)
 						SimpleGraph[next].Remove(node);
 					SimpleGraph.Remove(node);
