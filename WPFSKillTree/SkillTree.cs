@@ -337,7 +337,7 @@ namespace POESKillTree
 				if (group.Size > maxSize)
 					break;
 
-				if (group.Parts.Length == 0 && group.Size <= maxSize) {
+				if (group.Parts.Length == 0) {
 					maxSize = group.Size;
                     Console.Out.WriteLine(maxSize);
 					solutions.Add(group.Smallest.Edges);
