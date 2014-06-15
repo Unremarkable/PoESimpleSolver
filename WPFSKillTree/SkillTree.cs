@@ -260,7 +260,7 @@ namespace POESKillTree
 				}
 			}
 
-			PriorityQueue<int, TreeGroup> groups = new PriorityQueue<int, TreeGroup>();
+            BucketQueue<TreeGroup> groups = new BucketQueue<TreeGroup>();
 
 			List<TreePart> initialParts = new List<TreePart>();
 			{
@@ -272,7 +272,7 @@ namespace POESKillTree
 			TreeGroup initialGroup = new TreeGroup(initialParts.ToArray());
 			treeHash.Add(initialGroup);
 
-			groups.Enqueue(initialGroup.Size, initialGroup);
+			groups.Enqueue(initialGroup, initialGroup.Size );
 
 			collisions = 0;
 			int generation = 0;
@@ -280,9 +280,9 @@ namespace POESKillTree
 			List<List<Tuple<ushort, ushort>>> solutions = new List<List<Tuple<ushort, ushort>>>();
 
 			// DO WORK.
-			while (!groups.IsEmpty) {
+			while (!groups.IsEmpty()) {
 				generation++;
-				TreeGroup group = groups.DequeueValue();
+				TreeGroup group = groups.Dequeue();
 
 				if (group.Size > maxSize)
 					break;
@@ -331,7 +331,7 @@ namespace POESKillTree
 
 						if (!treeHash.Contains(newGroup)) {
 							treeHash.Add(newGroup);
-							groups.Enqueue(newGroup.Size, newGroup);
+							groups.Enqueue(newGroup, newGroup.Size );
 						}
 					}
 				}
