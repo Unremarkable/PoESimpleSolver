@@ -106,6 +106,8 @@ namespace POESKillTree
             public ushort right;
             public int id;
 
+			private int hashCode;
+
             public Edge(ushort left, ushort right)
             {
                 this.left = left;
@@ -119,7 +121,9 @@ namespace POESKillTree
 
             public override int GetHashCode()
             {
-                return left << 16| right;
+				return (left < right)
+					? (left  << 16) | right
+					: (right << 16) | left;
             }
         }
 
