@@ -207,7 +207,7 @@ namespace POESKillTree
 				this.Smallest = a;
                 AddToEdgeBitField(a);
 
-				this.Size = a.Size;
+				this.Size = a.Size - 1;
 				int index = 0;
 				for (int i = 0; i < b.Length; ++i) {
 					this.Size += b[i].Size;
@@ -228,7 +228,7 @@ namespace POESKillTree
 				this.Parts = new TreePart[a.Length - 1];
 				this.Smallest = a[0];
 
-				this.Size = a[0].Size;
+				this.Size = a[0].Size - 1;
 				int index = 0;
 				for (int i = 1; i < a.Length; ++i) {
 					this.Size += a[i].Size;
@@ -296,7 +296,7 @@ namespace POESKillTree
             public ulong[] edgeBitField = new ulong[10];
 		}
 
-		public List<List<Edge>> SolveSimpleGraph(IEnumerable<SkillNode> solveSet, int maxSize)
+		public List<TreePart> SolveSimpleGraph(IEnumerable<SkillNode> solveSet, int maxSize)
 		{
             int edgeIdCount = 0;
             Dictionary<Edge, int> allEdges = new Dictionary<Edge, int>();
@@ -323,11 +323,11 @@ namespace POESKillTree
 			TreeGroup initialGroup = new TreeGroup(initialParts.ToArray());
 			treeHash.Add(initialGroup);
 
-			groups.Enqueue(initialGroup, initialGroup.Size );
+			groups.Enqueue(initialGroup, initialGroup.Size);
 
 			int generation = 0;
 
-			List<List<Edge>> solutions = new List<List<Edge>>();
+			List<TreePart> solutions = new List<TreePart>();
 
 			// DO WORK.
 			while (!groups.IsEmpty()) {
@@ -338,9 +338,11 @@ namespace POESKillTree
 					break;
 
 				if (group.Parts.Length == 0) {
-					maxSize = group.Size;
-                    Console.Out.WriteLine(maxSize);
-					solutions.Add(group.Smallest.Edges);
+					if (group.Size < maxSize) {
+						solutions.Clear();
+						maxSize = group.Size;
+					}
+					solutions.Add(group.Smallest);
 					continue;
 				}
 
@@ -360,7 +362,7 @@ namespace POESKillTree
                         else
                         {
                             edge.id = edgeIdCount++;
-                            Console.WriteLine(edge.id);
+                        //  Console.WriteLine(edge.id);
                             allEdges[edge] = edge.id;
                         }
                         
@@ -494,6 +496,8 @@ namespace POESKillTree
 				var solutions = SolveSimpleGraph(SolveSet, 120);
 				solutionTime.Stop();
 				Console.WriteLine("{0} solutions found!", solutions.Count);
+				if (solutions.Count > 0)
+					Console.WriteLine("{0} points used.", solutions.First().Size);
 				Console.WriteLine("Solve time: {0}", solutionTime.Elapsed);
 
 				DrawSolvePath(solutions);
@@ -630,7 +634,7 @@ namespace POESKillTree
                 }
             }*/
 		}
-
+		/*
 		private bool EVERY_MST_CONTAINS(SkillNode node, List<List<Edge>> msts)
 		{
 			for (var i = 0; i < msts.Count; ++i) {
@@ -649,16 +653,9 @@ namespace POESKillTree
 
 		private bool ANY_MST_OF_NEIGHBORS_INCLUDES(SkillNode node)
 		{
-			HashSet<SkillNode> neighbor_of_neighbor = new HashSet<SkillNode>();
-			foreach (SkillNode neighbor in SimpleGraph[node].Keys)
-				neighbor_of_neighbor.Union(SimpleGraph[neighbor].Keys);
-			neighbor_of_neighbor.Remove(node);
-			foreach (SkillNode neighbor in SimpleGraph[node].Keys)
-				neighbor_of_neighbor.Remove(neighbor);
+			List<List<SkillNode>> power = PowerSet(SimpleGraph[node].Keys);
 
-			List<List<SkillNode>> power = PowerSet(neighbor_of_neighbor);
-
-			if (power.Count == neighbor_of_neighbor.Count)
+			if (power.Count == SimpleGraph[node].Count)
 				return true;
 
 			foreach (List<SkillNode> set in power) {
@@ -674,7 +671,7 @@ namespace POESKillTree
 			}
 
 			return false;
-		}
+		}*/
 
 		Dictionary<SkillNode, Dictionary<SkillNode, int>> SimpleGraph = new Dictionary<SkillNode, Dictionary<SkillNode, int>>();
 
@@ -728,7 +725,7 @@ namespace POESKillTree
 					SkillNode neighborB = neighbors.Keys.Last();
 
 					int cost = SimpleGraph[node][neighborA]
-								+ SimpleGraph[node][neighborB];
+					         + SimpleGraph[node][neighborB];
 
 					if (!SimpleGraph[neighborA].ContainsKey(neighborB) || SimpleGraph[neighborA][neighborB] > cost) {
 						SimpleGraph[neighborA][neighborB] = cost;
@@ -743,6 +740,20 @@ namespace POESKillTree
 				}
 			}
 
+			// Prune edges to neighbor if a shorter non-direct path exists.
+			// May be able to swap this with solve simple graph.
+			foreach (SkillNode origin in SimpleGraph.Keys) {
+				foreach (SkillNode destination in SimpleGraph[origin].Keys) {
+					int distance = SimpleGraph[origin][destination];
+					List<TreePart> solutions = SolveSimpleGraph(new SkillNode[] { origin, destination }, distance);
+					if (solutions.Count() > 1 || solutions.First().Size < distance) {
+						SimpleGraph[origin].Remove(destination);
+						SimpleGraph[destination].Remove(origin);
+						return true;
+					}
+				}
+			}
+
 			// MST test
 			foreach (SkillNode node in SimpleGraph.Keys) {
 				if (SolveSet.Contains(node))
@@ -751,24 +762,49 @@ namespace POESKillTree
 				if (SimpleGraph[node].Count != 3)
 					continue;
 
-				if (!ANY_MST_OF_NEIGHBORS_INCLUDES(node)) {
-					Console.WriteLine("I'm helping!");
-					foreach (SkillNode next in SimpleGraph[node].Keys)
-						SimpleGraph[next].Remove(node);
-					SimpleGraph.Remove(node);
-					return true;
-				}
-			}
+				int max = SimpleGraph[node].Sum(kvp => kvp.Value);
+				List<TreePart> solutions = SolveSimpleGraph(SimpleGraph[node].Keys, max);
 
-			// Prune edges to neighbor if a shorter non-direct path exists.
-			// May be able to swap this with solve simple graph.
-			foreach (SkillNode origin in SimpleGraph.Keys) {
-				foreach (SkillNode destination in SimpleGraph[origin].Keys) {
-					int distance = SimpleGraph[origin][destination];
-					if (ShortestOtherPath(origin, destination) <= distance) {
-						SimpleGraph[origin].Remove(destination);
-						SimpleGraph[destination].Remove(origin);
-						return true;
+
+				bool required = true;
+				foreach (TreePart solution in solutions) {
+					if (solution.Nodes.Contains(node.id))
+						continue;
+					required = false;
+					break;
+				}
+
+				if (!required) {
+					SkillNode a = SimpleGraph[node].ElementAt(0).Key;
+					SkillNode b = SimpleGraph[node].ElementAt(1).Key;
+					SkillNode c = SimpleGraph[node].ElementAt(2).Key;
+
+					SkillNode[][] s = new SkillNode[][] {
+						new SkillNode[] { a, b },
+						new SkillNode[] { a, c },
+						new SkillNode[] { b, c }
+					};
+
+					for (int i = 0; i < 3; ++i) {
+						int distance = SimpleGraph[node][s[i][0]] + SimpleGraph[node][s[i][1]];
+						List<TreePart> parts = SolveSimpleGraph(s[i], distance);
+						bool stillRequired = true;
+						foreach (TreePart part in parts) {
+							if (part.Nodes.Contains(node.id))
+								continue;
+							stillRequired = false;
+							break;
+						}
+
+						if (stillRequired) {
+							SimpleGraph[s[i][0]][s[i][1]] = distance;
+							SimpleGraph[s[i][1]][s[i][0]] = distance;
+
+							foreach (SkillNode next in SimpleGraph[node].Keys)
+								SimpleGraph[next].Remove(node);
+							SimpleGraph.Remove(node);
+							return true;
+						}
 					}
 				}
 			}

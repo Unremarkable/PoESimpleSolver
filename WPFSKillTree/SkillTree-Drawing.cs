@@ -95,7 +95,7 @@ namespace POESKillTree
 			}
 		}
 
-		public void DrawSolvePath(List<List<Edge>> edgesList)
+		public void DrawSolvePath(List<TreePart> edgesList)
 		{
             Dictionary<Edge, List<int>> edgeMap = new Dictionary<Edge, List<int>>();
 
@@ -109,7 +109,7 @@ namespace POESKillTree
 
 			using (DrawingContext dc = picSolvePaths.RenderOpen()) {
 				for (int i = 0; i < edgesList.Count; ++i) {
-					foreach (var edge in edgesList[i]) {
+					foreach (var edge in edgesList[i].Edges) {
 						if (!edgeMap.ContainsKey(edge))
 							edgeMap[edge] = new List<int>();
 						edgeMap[edge].Add(i);
