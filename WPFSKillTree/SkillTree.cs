@@ -106,8 +106,6 @@ namespace POESKillTree
             public ushort right;
             public int id;
 
-			private int hashCode;
-
             public Edge(ushort left, ushort right)
             {
                 this.left = left;
@@ -163,7 +161,7 @@ namespace POESKillTree
             public void addEdge(Edge newEdge)
             {
               //  Console.WriteLine(" addEdge " + newEdge.id / sizeof(long));
-                edgeBitField[newEdge.id / 64] |= 1 << (newEdge.id % 64);
+                edgeBitField[newEdge.id / 64] |= 1uL << (newEdge.id % 64);
                 Edges.Add(newEdge);
             }
 
@@ -188,18 +186,16 @@ namespace POESKillTree
 
 			public override int GetHashCode()
 			{
-                long hashCode = 0;
+                ulong hashCode = 0;
                 for (int i = 0; i < edgeBitField.Length; i++)
-                {
                     hashCode ^= edgeBitField[i];
-                }
                 return (int)hashCode ^ (int)(hashCode >> 32);
 			}
 
 			public int Size;
 			public List<Edge> Edges;
 			public HashSet<ushort> Nodes;
-            public long[] edgeBitField = new long[10];
+            public ulong[] edgeBitField = new ulong[10];
 		}
 
 		public class TreeGroup
@@ -258,7 +254,7 @@ namespace POESKillTree
 
 			public override int GetHashCode()
 			{
-                long hashCode = 0;
+                ulong hashCode = 0;
                 for (int i = 0; i < edgeBitField.Length; i++)
                 {
                     hashCode ^= edgeBitField[i];
@@ -297,7 +293,7 @@ namespace POESKillTree
 			public int Size;
 			public TreePart[] Parts;
 			public TreePart   Smallest;
-            public long[] edgeBitField = new long[10];
+            public ulong[] edgeBitField = new ulong[10];
 		}
 
 		public List<List<Edge>> SolveSimpleGraph(IEnumerable<SkillNode> solveSet, int maxSize)
@@ -932,8 +928,6 @@ namespace POESKillTree
             };
 
           var inTree = JsonConvert.DeserializeObject<PoEClasses.PoESkillTree>(treestring.Replace("Additional ", ""), jss);
-            int qindex = 0;
-
 
             foreach (var obj in inTree.skillSprites)
             {
@@ -954,8 +948,7 @@ namespace POESKillTree
                 {
                     iconActiveSkills.SkillPositions[o.Key] = new KeyValuePair<Rect, string>(new Rect(o.Value.x, o.Value.y, o.Value.w, o.Value.h), obj.Value[3].filename);
                 }
-            }   
-            qindex = 0;    
+            }    
 
             foreach(var ass in inTree.assets)
             {
