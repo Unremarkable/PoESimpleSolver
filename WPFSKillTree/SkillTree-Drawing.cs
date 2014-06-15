@@ -95,9 +95,9 @@ namespace POESKillTree
 			}
 		}
 
-		public void DrawSolvePath(List<List<Tuple<ushort, ushort>>> edgesList)
+		public void DrawSolvePath(List<List<Edge>> edgesList)
 		{
-			Dictionary<Tuple<ushort, ushort>, List<int>> edgeMap = new Dictionary<Tuple<ushort, ushort>, List<int>>(new EdgeComparer());
+            Dictionary<Edge, List<int>> edgeMap = new Dictionary<Edge, List<int>>();
 
 			Brush trunkBrush = new SolidColorBrush(Colors[0]);
 			Pen trunkPen = new Pen(trunkBrush, 20f);
@@ -118,7 +118,7 @@ namespace POESKillTree
 
 				foreach (var edge in edgeMap) {
 					if (edge.Value.Count == edgesList.Count)
-						FollowPathBetween(dc, trunkPen, Skillnodes[edge.Key.Item1], Skillnodes[edge.Key.Item2]);
+						FollowPathBetween(dc, trunkPen, Skillnodes[edge.Key.left], Skillnodes[edge.Key.right]);
 					if (edgesList.Count > 1) {
 						for (int j = 0; j < edge.Value.Count; ++j) {
 							int i = edge.Value[j];
@@ -126,7 +126,7 @@ namespace POESKillTree
 							pen.DashStyle = new DashStyle(new DoubleCollection() { 1, edge.Value.Count - 1 }, j);
 							pen.DashCap = PenLineCap.Flat;
 							//	dc.DrawLine(pen, Skillnodes[edge.Key.Item1].Position, Skillnodes[edge.Key.Item2].Position);
-							FollowPathBetween(dc, pen, Skillnodes[edge.Key.Item1], Skillnodes[edge.Key.Item2]);
+							FollowPathBetween(dc, pen, Skillnodes[edge.Key.left], Skillnodes[edge.Key.right]);
 						}
 					}
 				}
