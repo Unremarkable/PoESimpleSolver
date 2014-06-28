@@ -8,6 +8,7 @@ namespace POESKillTree.Utility
     class BucketQueue<TValue>
     {
         private HashSet<TValue>[] buckets = new HashSet<TValue>[125];
+        private Stack<TValue>[] stacks = new Stack<TValue>[125];
         private int lowestPriority = 125;
         private int count =0;
 
@@ -16,6 +17,7 @@ namespace POESKillTree.Utility
             for (int i = 0; i < buckets.Length; i++)
             {
                 buckets[i] = new HashSet<TValue>(EqualityComparer<TValue>.Default);
+                stacks[i] = new Stack<TValue>();
             }
         }
 
@@ -24,6 +26,7 @@ namespace POESKillTree.Utility
             if (buckets[priority].Add(value))
             {
                 count++;
+                stacks[priority].Push(value);
                 if (priority < lowestPriority)
                     lowestPriority = priority;
             }
@@ -33,7 +36,7 @@ namespace POESKillTree.Utility
         {
             if (IsEmpty())
                 throw new InvalidOperationException("Can't dequeue from an empty queue, jackass");
-            TValue lowest = buckets[lowestPriority].First();
+            TValue lowest = stacks[lowestPriority].Pop();
             buckets[lowestPriority].Remove(lowest);
             if (buckets[lowestPriority].Count == 0)
             {

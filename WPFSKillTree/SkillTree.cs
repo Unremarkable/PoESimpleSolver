@@ -121,11 +121,8 @@ namespace POESKillTree
 			public TreePart(TreePart clone)
 			{
 				this.Nodes    = new HashSet<ushort>(clone.Nodes);
-				this.Edges    = new List<Edge>();
-                foreach (Edge edge in clone.Edges)
-                {
-                    addEdge(edge);
-                }
+                this.Edges = new List<Edge>(clone.Edges);
+                clone.edgeBitField.CopyTo(this.edgeBitField, 0);
 				this.Size     = clone.Size;
 			}
 
@@ -219,7 +216,7 @@ namespace POESKillTree
 					}
 				}
 
-				this.SteinerCount = Parts.Sum(p => p.SteinerCount());
+		//		this.SteinerCount = Parts.Sum(p => p.SteinerCount());
 			}
 
 			public TreeGroup(TreePart[] a)
@@ -242,7 +239,7 @@ namespace POESKillTree
 					}
 				}
 
-				this.SteinerCount = Parts.Sum(p => p.SteinerCount());
+			//	this.SteinerCount = Parts.Sum(p => p.SteinerCount());
 			}
 
 			public TreePart Containing(ushort node)
@@ -338,6 +335,10 @@ namespace POESKillTree
 
 				if (group.Size > maxSize)
 					break;
+
+                if (generation % 10000 == 0) { 
+                    Console.WriteLine(generation + " " + group.Size);
+                 }
 
 				TreePart smallest = group.Smallest;
 
