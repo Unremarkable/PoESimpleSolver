@@ -80,25 +80,6 @@ namespace POESKillTree
         };
 
 		HashSet<SkillNode> SolveSet = new HashSet<SkillNode>();
-        /*
-		public class EdgeComparer : IEqualityComparer<Edge>
-		{
-			public static EdgeComparer Instance = new EdgeComparer();
-
-			public bool Equals(Edge x, Edge y)
-			{
-				return (x.Item1 == y.Item1 && x.Item2 == y.Item2)
-					|| (x.Item1 == y.Item2 && x.Item2 == y.Item1);
-			}
-
-			public int GetHashCode(Edge obj)
-			{
-				if (obj.Item1 < obj.Item2)
-					return (obj.Item1 << sizeof(ushort)) | obj.Item2;
-				else
-					return (obj.Item2 << sizeof(ushort)) | obj.Item1;
-			}
-		}*/
 
         public class Edge
         {
@@ -190,6 +171,22 @@ namespace POESKillTree
                 for (int i = 0; i < edgeBitField.Length; i++)
                     hashCode ^= edgeBitField[i];
                 return (int)hashCode ^ (int)(hashCode >> 32);
+			}
+
+			public int SteinerCount()
+			{
+				Dictionary<ushort, int> counts = new Dictionary<ushort, int>(Nodes.Count);
+				foreach (ushort n in Nodes)
+					counts[n] = 0;
+				foreach (Edge e in Edges) {
+					counts[e.left]++;
+					counts[e.right]++;
+				}
+				int sum = 0;
+				foreach (int c in counts.Values)
+					if (c > 2)
+						sum += c - 2;
+				return sum;
 			}
 
 			public int Size;
@@ -290,6 +287,11 @@ namespace POESKillTree
 				return false;
 			}
 
+			public int SteinerCount()
+			{
+				return Parts.Sum(p => p.SteinerCount());
+			}
+
 			public int Size;
 			public TreePart[] Parts;
 			public TreePart   Smallest;
@@ -320,6 +322,8 @@ namespace POESKillTree
 				}
 			}
 
+			int maxSteiners = initialParts.Count - 2;
+
 			TreeGroup initialGroup = new TreeGroup(initialParts.ToArray());
 			treeHash.Add(initialGroup);
 
@@ -336,15 +340,6 @@ namespace POESKillTree
 
 				if (group.Size > maxSize)
 					break;
-
-				if (group.Parts.Length == 0) {
-					if (group.Size < maxSize) {
-						solutions.Clear();
-						maxSize = group.Size;
-					}
-					solutions.Add(group.Smallest);
-					continue;
-				}
 
 				TreePart smallest = group.Smallest;
 
@@ -388,96 +383,32 @@ namespace POESKillTree
 						if (newGroup.Size > maxSize)
 							continue;
 
-						if (!treeHash.Contains(newGroup)) {
-							treeHash.Add(newGroup);
-							groups.Enqueue(newGroup, newGroup.Size );
+						if (newGroup.SteinerCount() > maxSteiners)
+							continue;
+
+						if (treeHash.Contains(newGroup))
+							continue;
+
+						treeHash.Add(newGroup);
+
+						if (newGroup.Parts.Length == 0) {
+							if (newGroup.Size < maxSize) {
+								solutions.Clear();
+								maxSize = newGroup.Size;
+							}
+							newGroup.Smallest.Size = maxSize; ;
+							solutions.Add(newGroup.Smallest);
+						//	groups.CapPriority(maxSize);
+							continue;
 						}
+
+						groups.Enqueue(newGroup, newGroup.Size);
 					}
 				}
 			}
             
 			return solutions;
 		}
-
-		/*
-        private class SubTree : IComparable<SubTree>, IEquatable<SubTree>
-        {
-			private class Prioritizer : IPrioritizer<SubTree>
-			{
-				int IPrioritizer<SubTree>.PriorityOf(SubTree t)
-				{
-					return t.size;
-				}
-			}
-
-			public static IPrioritizer<SubTree> Prioritizer = new Prioritizer();
-
-      //    public HashSet<Edge> edges;
-
-            HashSet<ushort> nodes;
-            public int size;
-            private int hashCode;
-
-            public SubTree(HashSet<Edge> edges, int size)
-            {
-                this.edges = edges;
-                this.size = size;
-            }
-
-			public bool Equals(SubTree other)
-			{
-				if (other.GetHashCode() != this.GetHashCode())
-					return false;
-				if (other.edges.Count != this.edges.Count)
-					return false;
-			//	foreach (Edge edge in edges) {
-			//		if (!other.edges.Contains(edge))
-			//			return false;
-			//	}
-				return true;
-			}
-
-            public override bool Equals(object other)
-            {
-				if (other is SubTree)
-					return (this as IEquatable<SubTree>).Equals(other as SubTree);
-				return false;
-            }
-
-            public int CompareTo(SubTree other)
-			{
-				if (this.Equals(other))
-					return  0;
-				if (this.size > other.size)
-					return  1;
-				if (this.size < other.size)
-					return -1;
-				if (this.GetHashCode() > other.GetHashCode())
-					return  1;
-				return -1;
-            }
-
-            public HashSet<ushort> getNodeIds() {
-                if (nodes == null) {
-                    nodes = new HashSet<ushort>(edges.Select(edge => edge.Item1));
-                    nodes.UnionWith(edges.Select(edge => edge.Item2));
-                }               
-                return nodes;
-            }
-
-            public override int GetHashCode() {
-                if (hashCode == 0)
-                {
-                    foreach (Edge edge in edges)
-                    {
-                        hashCode += edge.Item1;
-                        hashCode += edge.Item2;
-                    }
-                }
-
-                return hashCode;
-            }
-		}*/
 
 		public void Solve()
 		{
@@ -493,7 +424,7 @@ namespace POESKillTree
 				DrawSimpleGraph(SimpleGraph);
 
 				Stopwatch solutionTime = Stopwatch.StartNew();
-				var solutions = SolveSimpleGraph(SolveSet, 120);
+				var solutions = SolveSimpleGraph(SolveSet, 66);
 				solutionTime.Stop();
 				Console.WriteLine("{0} solutions found!", solutions.Count);
 				if (solutions.Count > 0)
@@ -527,7 +458,7 @@ namespace POESKillTree
 				ShortestPathTable[skillNode] = new Dictionary<SkillNode, Tuple<HashSet<SkillNode>, int>>();
 				ShortestPathTable[skillNode][skillNode] = new Tuple<HashSet<SkillNode>, int>(new HashSet<SkillNode>(), 0);
 				foreach (var neighbor in skillNode.Neighbor) {
-					ShortestPathTable[skillNode][neighbor] = new Tuple<HashSet<SkillNode>, int>(new HashSet<SkillNode>(), 1);
+					ShortestPathTable[skillNode][neighbor] = new Tuple<HashSet<SkillNode>, int>(new HashSet<SkillNode>(), SkilledNodes.Contains(neighbor.id) ? 0 : 1);
 					ShortestPathTable[skillNode][neighbor].Item1.Add(neighbor);
 				}
 			}
@@ -541,10 +472,11 @@ namespace POESKillTree
 					HashSet<SkillNode> newFrontier = new HashSet<SkillNode>();
 					foreach (var frontierNode in frontier) {
 						foreach (var neighbor in frontierNode.Neighbor) {
+							int cost = SkilledNodes.Contains(neighbor.id) ? 0 : 1;
 							if (!visited.Contains(neighbor) && !frontier.Contains(neighbor)) {
 								newFrontier.Add(neighbor);
 								if (!ShortestPathTable[originNode].ContainsKey(neighbor))
-									ShortestPathTable[originNode][neighbor] = new Tuple<HashSet<SkillNode>, int>(new HashSet<SkillNode>(), ShortestPathTable[originNode][frontierNode].Item2 + 1);
+									ShortestPathTable[originNode][neighbor] = new Tuple<HashSet<SkillNode>, int>(new HashSet<SkillNode>(), ShortestPathTable[originNode][frontierNode].Item2 + cost);
 								ShortestPathTable[originNode][neighbor].Item1.UnionWith(ShortestPathTable[originNode][frontierNode].Item1);
 							}
 						}
@@ -754,61 +686,6 @@ namespace POESKillTree
 				}
 			}
 
-			// MST test
-			foreach (SkillNode node in SimpleGraph.Keys) {
-				if (SolveSet.Contains(node))
-					continue;
-
-				if (SimpleGraph[node].Count != 3)
-					continue;
-
-				int max = SimpleGraph[node].Sum(kvp => kvp.Value);
-				List<TreePart> solutions = SolveSimpleGraph(SimpleGraph[node].Keys, max);
-
-
-				bool required = true;
-				foreach (TreePart solution in solutions) {
-					if (solution.Nodes.Contains(node.id))
-						continue;
-					required = false;
-					break;
-				}
-
-				if (!required) {
-					SkillNode a = SimpleGraph[node].ElementAt(0).Key;
-					SkillNode b = SimpleGraph[node].ElementAt(1).Key;
-					SkillNode c = SimpleGraph[node].ElementAt(2).Key;
-
-					SkillNode[][] s = new SkillNode[][] {
-						new SkillNode[] { a, b },
-						new SkillNode[] { a, c },
-						new SkillNode[] { b, c }
-					};
-
-					for (int i = 0; i < 3; ++i) {
-						int distance = SimpleGraph[node][s[i][0]] + SimpleGraph[node][s[i][1]];
-						List<TreePart> parts = SolveSimpleGraph(s[i], distance);
-						bool stillRequired = true;
-						foreach (TreePart part in parts) {
-							if (part.Nodes.Contains(node.id))
-								continue;
-							stillRequired = false;
-							break;
-						}
-
-						if (stillRequired) {
-							SimpleGraph[s[i][0]][s[i][1]] = distance;
-							SimpleGraph[s[i][1]][s[i][0]] = distance;
-
-							foreach (SkillNode next in SimpleGraph[node].Keys)
-								SimpleGraph[next].Remove(node);
-							SimpleGraph.Remove(node);
-							return true;
-						}
-					}
-				}
-			}
-
 			// Removes edges that move away from everything.
 			foreach (SkillNode node in SimpleGraph.Keys) {
 				foreach (var neighbor in SimpleGraph[node].Keys) {
@@ -827,6 +704,35 @@ namespace POESKillTree
 						SimpleGraph[neighbor].Remove(node);
 						return true;
 					}
+				}
+			}
+
+			// MST test
+			foreach (SkillNode node in SimpleGraph.Keys) {
+				if (SolveSet.Contains(node))
+					continue;
+
+				if (SimpleGraph[node].Count != 3)
+					continue;
+
+				int max = SimpleGraph[node].Sum(kvp => kvp.Value);
+				List<TreePart> solutions = SolveSimpleGraph(SimpleGraph[node].Keys, max);
+
+				if (solutions.Count > 1) {
+					SkillNode a = SimpleGraph[node].ElementAt(0).Key;
+					SkillNode b = SimpleGraph[node].ElementAt(1).Key;
+					SkillNode c = SimpleGraph[node].ElementAt(2).Key;
+
+					if (!SimpleGraph[a].ContainsKey(b) || SimpleGraph[a][b] > SimpleGraph[node][a] + SimpleGraph[node][b]) SimpleGraph[a][b] = SimpleGraph[b][a] = SimpleGraph[node][a] + SimpleGraph[node][b]; 
+					if (!SimpleGraph[a].ContainsKey(c) || SimpleGraph[a][c] > SimpleGraph[node][a] + SimpleGraph[node][c]) SimpleGraph[a][c] = SimpleGraph[c][a] = SimpleGraph[node][a] + SimpleGraph[node][c]; 
+					if (!SimpleGraph[b].ContainsKey(c) || SimpleGraph[b][c] > SimpleGraph[node][b] + SimpleGraph[node][c]) SimpleGraph[b][c] = SimpleGraph[c][b] = SimpleGraph[node][b] + SimpleGraph[node][c]; 
+
+					SimpleGraph[a].Remove(node);
+					SimpleGraph[b].Remove(node);
+					SimpleGraph[c].Remove(node);
+					SimpleGraph.Remove(node);
+
+					return true;
 				}
 			}
 
