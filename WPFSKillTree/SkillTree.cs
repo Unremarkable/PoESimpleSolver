@@ -113,7 +113,7 @@ namespace POESKillTree
 			{
 				this.Nodes    = new HashSet<ushort>();
 				this.Edges    = new List<Edge>();
-				this.Size     = 1;
+				this.Size     = 0;
 
 				this.Nodes.Add(start.id);
 			}
@@ -136,7 +136,7 @@ namespace POESKillTree
                 {
                     addEdge(edge);
                 }
-                Size += other.Size - 1;
+                Size += other.Size;
             }
 
             public void addEdge(Edge newEdge)
@@ -204,7 +204,7 @@ namespace POESKillTree
 				this.Smallest = a;
                 AddToEdgeBitField(a);
 
-				this.Size = a.Size - 1;
+				this.Size = a.Size;
 				int index = 0;
 				for (int i = 0; i < b.Length; ++i) {
 					this.Size += b[i].Size;
@@ -227,7 +227,7 @@ namespace POESKillTree
 				this.Parts = new TreePart[a.Length - 1];
 				this.Smallest = a[0];
 
-				this.Size = a[0].Size - 1;
+				this.Size = a[0].Size;
 				int index = 0;
 				for (int i = 1; i < a.Length; ++i) {
 					this.Size += a[i].Size;
@@ -342,7 +342,7 @@ namespace POESKillTree
 				TreePart smallest = group.Smallest;
 
 				foreach (ushort node in smallest.Nodes) {
-					int remaining = maxSize - group.Size + 1;
+					int remaining = maxSize - group.Size;
 					foreach (var next in neighbors[node]) {
 						if (smallest.Nodes.Contains(next.Key))
 							continue;
@@ -382,9 +382,6 @@ namespace POESKillTree
 							newGroup = new TreeGroup(part, group.Parts);
 						}
 
-						if (newGroup.Size > maxSize)
-							continue;
-
 						if (newGroup.SteinerCount > maxSteiners)
 							continue;
 
@@ -393,11 +390,14 @@ namespace POESKillTree
 								solutions.Clear();
 								maxSize = newGroup.Size;
 							}
-							newGroup.Smallest.Size = maxSize; ;
+
 							solutions.Add(newGroup.Smallest);
 						//	groups.CapPriority(maxSize);
 							continue;
 						}
+
+						if (newGroup.Size >= maxSize)
+							continue;
 
 						groups.Enqueue(newGroup, newGroup.Size);
 					}
