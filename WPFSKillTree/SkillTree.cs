@@ -218,6 +218,8 @@ namespace POESKillTree
 						this.Parts[index++] = b[i];
 					}
 				}
+
+				this.SteinerCount = Parts.Sum(p => p.SteinerCount());
 			}
 
 			public TreeGroup(TreePart[] a)
@@ -239,6 +241,8 @@ namespace POESKillTree
 						this.Parts[index++] = a[i];
 					}
 				}
+
+				this.SteinerCount = Parts.Sum(p => p.SteinerCount());
 			}
 
 			public TreePart Containing(ushort node)
@@ -287,15 +291,11 @@ namespace POESKillTree
 				return false;
 			}
 
-			public int SteinerCount()
-			{
-				return Parts.Sum(p => p.SteinerCount());
-			}
-
 			public int Size;
 			public TreePart[] Parts;
 			public TreePart   Smallest;
             public ulong[] edgeBitField = new ulong[10];
+			public int SteinerCount;
 		}
 
 		public List<TreePart> SolveSimpleGraph(IEnumerable<SkillNode> solveSet, int maxSize)
@@ -344,8 +344,12 @@ namespace POESKillTree
 				TreePart smallest = group.Smallest;
 
 				foreach (ushort node in smallest.Nodes) {
+					int remaining = maxSize - group.Size + 1;
 					foreach (var next in neighbors[node]) {
 						if (smallest.Nodes.Contains(next.Key))
+							continue;
+
+						if (next.Value > remaining)
 							continue;
 
 						TreePart part = new TreePart(smallest);
@@ -383,13 +387,12 @@ namespace POESKillTree
 						if (newGroup.Size > maxSize)
 							continue;
 
-						if (newGroup.SteinerCount() > maxSteiners)
+						if (newGroup.SteinerCount > maxSteiners)
 							continue;
 
 						if (treeHash.Contains(newGroup))
 							continue;
 
-						treeHash.Add(newGroup);
 
 						if (newGroup.Parts.Length == 0) {
 							if (newGroup.Size < maxSize) {
@@ -402,6 +405,7 @@ namespace POESKillTree
 							continue;
 						}
 
+						treeHash.Add(newGroup);
 						groups.Enqueue(newGroup, newGroup.Size);
 					}
 				}
@@ -424,7 +428,7 @@ namespace POESKillTree
 				DrawSimpleGraph(SimpleGraph);
 
 				Stopwatch solutionTime = Stopwatch.StartNew();
-				var solutions = SolveSimpleGraph(SolveSet, 66);
+				var solutions = SolveSimpleGraph(SolveSet, 120);
 				solutionTime.Stop();
 				Console.WriteLine("{0} solutions found!", solutions.Count);
 				if (solutions.Count > 0)
