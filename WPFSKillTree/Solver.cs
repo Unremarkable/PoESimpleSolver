@@ -199,8 +199,9 @@ namespace POESKillTree
 
 		public List<TreePart> Solve(HashSet<ushort> solveSet)
 		{
-			var external = CalculateExternals(solveSet);
-			var graph = ConstructSimpleGraph(solveSet, external);
+			var graph = ConstructSimpleGraph(solveSet);
+			
+			RemoveExternals(graph, solveSet);
 
 			Stopwatch simplifyTime = Stopwatch.StartNew();
 			while (Simplify(graph, solveSet)) ;
@@ -264,23 +265,24 @@ namespace POESKillTree
 			}
 		}
 
-		private void MarkExternalRecursively(ushort node, HashSet<ushort> isInternal, HashSet<ushort> isExternal)
+		private void RemoveExternalRecursively(Dictionary<ushort, Dictionary<ushort, int>> graph, ushort node, HashSet<ushort> isInternal)
 		{
-			if (isInternal.Contains(node) || isExternal.Contains(node)) {
+			if (isInternal.Contains(node) || !graph.ContainsKey(node)) {
 				return;
 			}
 
-			isExternal.Add(node);
-
-			foreach (SkillTree.SkillNode neighbor in Graph[node].Neighbor) {
-				MarkExternalRecursively(neighbor.id, isInternal, isExternal);
-			}
+			IEnumerable<ushort> neighbors = graph[node].Keys;
+			graph.Remove(node);
+			
+			foreach (ushort neighbor in neighbors)
+				graph[neighbor].Remove(node);
+			foreach (ushort neighbor in neighbors)
+				RemoveExternalRecursively(graph, neighbor, isInternal);
 		}
 
-		private HashSet<ushort> CalculateExternals(HashSet<ushort> solveSet)
+		private void RemoveExternals(Dictionary<ushort, Dictionary<ushort, int>> graph, HashSet<ushort> solveSet)
 		{
 			HashSet<ushort> isInternal = new HashSet<ushort>();
-			HashSet<ushort> isExternal = new HashSet<ushort>();
 
 			HashSet<ushort> remaining = new HashSet<ushort>(solveSet);
 			foreach (var skillA in solveSet) {
@@ -295,10 +297,8 @@ namespace POESKillTree
 
 			List<ushort> external = new List<ushort> { 40633, 34098, 9660, 12926, 31961, 44941, 59763, 18663, 22535, 31703, 22115, 24426, 14914, 54922 };
 			foreach (ushort externalId in external) {
-				MarkExternalRecursively(externalId, isInternal, isExternal);
+				RemoveExternalRecursively(graph, externalId, isInternal);
 			}
-
-			return isExternal;
 		}
 
 		private void GetShortestPathNodes(ushort from, ushort to, HashSet<ushort> currentSet)
@@ -324,21 +324,17 @@ namespace POESKillTree
 			return shortestPathNodes;
 		}
 
-		private Dictionary<ushort, Dictionary<ushort, int>> ConstructSimpleGraph(HashSet<ushort> solveSet, HashSet<ushort> external)
+		private Dictionary<ushort, Dictionary<ushort, int>> ConstructSimpleGraph(HashSet<ushort> solveSet)
 		{
 			Dictionary<ushort, Dictionary<ushort, int>> graph = new Dictionary<ushort, Dictionary<ushort, int>>();
 
 			foreach (SkillTree.SkillNode node in Graph.Values) {
 				if (!solveSet.Contains(node.id) && (node.spc != null || node.Mastery))
 					continue;
-				if (external.Contains(node.id))
-					continue;
 
 				graph.Add(node.id, new Dictionary<ushort, int>());
 				foreach (SkillTree.SkillNode neighbor in node.Neighbor) {
 					if (!solveSet.Contains(neighbor.id) && (neighbor.spc != null || neighbor.Mastery))
-						continue;
-					if (external.Contains(neighbor.id))
 						continue;
 
 					graph[node.id].Add(neighbor.id, 1);
@@ -491,7 +487,7 @@ namespace POESKillTree
 				if (group.Size > maxSize)
 					break;
 
-				if (generation % 10000 == 0) {
+				if (generation % 100000 == 0) {
 					Console.WriteLine(generation + " " + group.Size);
 				}
 
