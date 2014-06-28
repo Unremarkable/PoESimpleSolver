@@ -57,12 +57,12 @@ namespace POESKillTree
 			picSimplePaths = new DrawingVisual();
         }
 
-		public void DrawSolveHalo(HashSet<SkillNode> nodes)
+		public void DrawSolveHalo(HashSet<ushort> nodes)
 		{
 			Pen hpen = new Pen(Brushes.Crimson, 20);
 			using (DrawingContext dc = picSolveHalos.RenderOpen()) {
-				foreach (SkillNode node in nodes) {
-					dc.DrawEllipse(null, hpen, node.Position, 80, 80);
+				foreach (ushort node in nodes) {
+					dc.DrawEllipse(null, hpen, Skillnodes[node].Position, 80, 80);
 				}
 			}
 		}
@@ -78,15 +78,15 @@ namespace POESKillTree
 			Color.FromRgb(0x00, 0xE0, 0x00), Color.FromRgb(0x00, 0x00, 0xE0), Color.FromRgb(0xE0, 0xE0, 0x00), Color.FromRgb(0xE0, 0x00, 0xE0), Color.FromRgb(0x00, 0xE0, 0xE0), Color.FromRgb(0xE0, 0xE0, 0xE0), 
 		};
 
-		private void FollowPathBetween(DrawingContext dc, Pen pen, SkillNode from, SkillNode goal)
+		private void FollowPathBetween(DrawingContext dc, Pen pen, ushort from, ushort goal)
 		{
-			HashSet<SkillNode> front = new HashSet<SkillNode>();
+			HashSet<ushort> front = new HashSet<ushort>();
 			front.Add(from);
 			while (front.Count > 0) {
-				HashSet<SkillNode> newFront = new HashSet<SkillNode>();
-				foreach (SkillNode next in front) {
-					foreach (SkillNode to in ShortestPathTable[next][goal].Item1) {
-						DrawConnection(dc, pen, next, to);
+				HashSet<ushort> newFront = new HashSet<ushort>();
+				foreach (ushort next in front) {
+					foreach (ushort to in Solver.NextStepBetween(next, goal)) {
+						DrawConnection(dc, pen, Skillnodes[next], Skillnodes[to]);
 						if (to != goal)
 							newFront.Add(to);
 					}
@@ -95,9 +95,9 @@ namespace POESKillTree
 			}
 		}
 
-		public void DrawSolvePath(List<TreePart> edgesList)
+		public void DrawSolvePath(List<Solver.TreePart> edgesList)
 		{
-            Dictionary<Edge, List<int>> edgeMap = new Dictionary<Edge, List<int>>();
+			Dictionary<Solver.Edge, List<int>> edgeMap = new Dictionary<Solver.Edge, List<int>>();
 
 			Brush trunkBrush = new SolidColorBrush(Colors[0]);
 			Pen trunkPen = new Pen(trunkBrush, 20f);
@@ -118,7 +118,7 @@ namespace POESKillTree
 
 				foreach (var edge in edgeMap) {
 					if (edge.Value.Count == edgesList.Count)
-						FollowPathBetween(dc, trunkPen, Skillnodes[edge.Key.left], Skillnodes[edge.Key.right]);
+						FollowPathBetween(dc, trunkPen, edge.Key.left, edge.Key.right);
 					if (edgesList.Count > 1) {
 						for (int j = 0; j < edge.Value.Count; ++j) {
 							int i = edge.Value[j];
@@ -126,7 +126,7 @@ namespace POESKillTree
 							pen.DashStyle = new DashStyle(new DoubleCollection() { 1, edge.Value.Count - 1 }, j);
 							pen.DashCap = PenLineCap.Flat;
 							//	dc.DrawLine(pen, Skillnodes[edge.Key.Item1].Position, Skillnodes[edge.Key.Item2].Position);
-							FollowPathBetween(dc, pen, Skillnodes[edge.Key.left], Skillnodes[edge.Key.right]);
+							FollowPathBetween(dc, pen, edge.Key.left, edge.Key.right);
 						}
 					}
 				}
@@ -142,20 +142,20 @@ namespace POESKillTree
 			}
 		}
 
-		public void DrawSimpleGraph(Dictionary<SkillNode, Dictionary<SkillNode, int>> paths)
+		public void DrawSimpleGraph(Dictionary<ushort, Dictionary<ushort, int>> paths)
 		{
 			System.Windows.Media.Brush brush = new SolidColorBrush(Color.FromArgb(32, 255, 0, 0));
 			System.Windows.Media.Pen hpen = new System.Windows.Media.Pen(brush, 15f);
 
 
 			using (DrawingContext dc = picSimplePaths.RenderOpen()) {
-				foreach (KeyValuePair<SkillNode, Dictionary<SkillNode, int>> pair in paths) {
+				foreach (KeyValuePair<ushort, Dictionary<ushort, int>> pair in paths) {
 					foreach (var ep in pair.Value) {
-						dc.DrawLine(hpen, pair.Key.Position, ep.Key.Position);
+						dc.DrawLine(hpen, Skillnodes[pair.Key].Position, Skillnodes[ep.Key].Position);
 						dc.DrawText(new FormattedText(ep.Value.ToString(), CultureInfo.GetCultureInfo("en-us"),
 		  FlowDirection.LeftToRight,
 		  new Typeface("Verdana"),
-		  64, System.Windows.Media.Brushes.Red), (pair.Key.Position + ep.Key.Position) / 2);
+		  64, System.Windows.Media.Brushes.Red), (Skillnodes[pair.Key].Position + Skillnodes[ep.Key].Position) / 2);
 					}
 				}
 			}
@@ -217,7 +217,7 @@ namespace POESKillTree
         }
 
         private void DrawLinkBackgroundLayer()
-        {
+        {/*
             Pen pen2 = new Pen(Brushes.DarkSlateGray, 32);
             HashSet<ushort> visited = new HashSet<ushort>(SkilledNodes);
             using (DrawingContext dc = picLinks.RenderOpen())
@@ -236,7 +236,7 @@ namespace POESKillTree
                         visited.Add(skillNode.Key);
                     }
                 }
-            }
+            }*/
         }
 
         private void DrawSkillIconLayer()

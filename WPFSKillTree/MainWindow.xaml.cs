@@ -175,7 +175,7 @@ namespace POESKillTree
 
                 if (node.spc == null) {
 					if (Keyboard.IsKeyDown(Key.LeftCtrl)) {
-						Tree.ToggleToSolve(node);
+						Tree.ToggleToSolve(node.id);
 					} else {
 						if (Tree.SkilledNodes.Contains(node.id)) {
 							Tree.ForceRefundNode(node.id);
