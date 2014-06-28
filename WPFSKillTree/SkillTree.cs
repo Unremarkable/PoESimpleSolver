@@ -329,7 +329,7 @@ namespace POESKillTree
 
 			int generation = 0;
 
-			List<TreePart> solutions = new List<TreePart>();
+            HashSet<TreePart> solutions = new HashSet<TreePart>(EqualityComparer<TreePart>.Default);
 
 			// DO WORK.
 			while (!groups.IsEmpty()) {
@@ -345,6 +345,9 @@ namespace POESKillTree
 					foreach (var next in neighbors[node]) {
 						if (smallest.Nodes.Contains(next.Key))
 							continue;
+
+                        if (group.Size + next.Value - 1 > maxSize)
+                            continue;
 
 						TreePart part = new TreePart(smallest);
 						Edge edge = new Edge(node, next.Key);
@@ -400,7 +403,7 @@ namespace POESKillTree
 				}
 			}
             
-			return solutions;
+			return solutions.ToList();
 		}
 
 		public void Solve()
@@ -671,7 +674,8 @@ namespace POESKillTree
 				foreach (SkillNode destination in SimpleGraph[origin].Keys) {
 					int distance = SimpleGraph[origin][destination];
 					List<TreePart> solutions = SolveSimpleGraph(new SkillNode[] { origin, destination }, distance);
-					if (solutions.Count() > 1) {
+                    if (solutions.Count() > 1 || solutions.First().Size < distance)
+                    {
 						SimpleGraph[origin].Remove(destination);
 						SimpleGraph[destination].Remove(origin);
 						return true;
@@ -711,7 +715,7 @@ namespace POESKillTree
 				int max = SimpleGraph[node].Sum(kvp => kvp.Value);
 				List<TreePart> solutions = SolveSimpleGraph(SimpleGraph[node].Keys, max);
 
-				if (solutions.Count > 1) {
+				if (solutions.Count > 1 || solutions.First().Size < max) {
 					SkillNode a = SimpleGraph[node].ElementAt(0).Key;
 					SkillNode b = SimpleGraph[node].ElementAt(1).Key;
 					SkillNode c = SimpleGraph[node].ElementAt(2).Key;
