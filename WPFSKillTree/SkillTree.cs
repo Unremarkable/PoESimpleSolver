@@ -303,8 +303,7 @@ namespace POESKillTree
             int edgeIdCount = 0;
             Dictionary<Edge, int> allEdges = new Dictionary<Edge, int>();
 			Dictionary<ushort, List<KeyValuePair<ushort, int>>> neighbors = new Dictionary<ushort, List<KeyValuePair<ushort, int>>>();
-			HashSet<TreeGroup> treeHash = new HashSet<TreeGroup>(EqualityComparer<TreeGroup>.Default);
-
+			
 			// INITIALIZE
 			foreach (var origin in SimpleGraph) {
 				neighbors[origin.Key.id] = new List<KeyValuePair<ushort, int>>();
@@ -325,8 +324,7 @@ namespace POESKillTree
 			int maxSteiners = initialParts.Count - 2;
 
 			TreeGroup initialGroup = new TreeGroup(initialParts.ToArray());
-			treeHash.Add(initialGroup);
-
+			
 			groups.Enqueue(initialGroup, initialGroup.Size);
 
 			int generation = 0;
@@ -385,11 +383,6 @@ namespace POESKillTree
 
 						if (newGroup.SteinerCount() > maxSteiners)
 							continue;
-
-						if (treeHash.Contains(newGroup))
-							continue;
-
-						treeHash.Add(newGroup);
 
 						if (newGroup.Parts.Length == 0) {
 							if (newGroup.Size < maxSize) {
@@ -678,7 +671,7 @@ namespace POESKillTree
 				foreach (SkillNode destination in SimpleGraph[origin].Keys) {
 					int distance = SimpleGraph[origin][destination];
 					List<TreePart> solutions = SolveSimpleGraph(new SkillNode[] { origin, destination }, distance);
-					if (solutions.Count() > 1 || solutions.First().Size < distance) {
+					if (solutions.Count() > 1) {
 						SimpleGraph[origin].Remove(destination);
 						SimpleGraph[destination].Remove(origin);
 						return true;
