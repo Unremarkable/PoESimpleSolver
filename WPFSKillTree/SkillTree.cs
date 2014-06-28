@@ -113,7 +113,7 @@ namespace POESKillTree
 			{
 				this.Nodes    = new HashSet<ushort>();
 				this.Edges    = new List<Edge>();
-				this.Size     = 1;
+				this.Size     = 0;
 
 				this.Nodes.Add(start.id);
 			}
@@ -136,7 +136,7 @@ namespace POESKillTree
                 {
                     addEdge(edge);
                 }
-                Size += other.Size - 1;
+                Size += other.Size;
             }
 
             public void addEdge(Edge newEdge)
@@ -204,7 +204,7 @@ namespace POESKillTree
 				this.Smallest = a;
                 AddToEdgeBitField(a);
 
-				this.Size = a.Size - 1;
+				this.Size = a.Size;
 				int index = 0;
 				for (int i = 0; i < b.Length; ++i) {
 					this.Size += b[i].Size;
@@ -218,6 +218,8 @@ namespace POESKillTree
 						this.Parts[index++] = b[i];
 					}
 				}
+
+				this.SteinerCount = Parts.Sum(p => p.SteinerCount());
 			}
 
 			public TreeGroup(TreePart[] a)
@@ -225,7 +227,7 @@ namespace POESKillTree
 				this.Parts = new TreePart[a.Length - 1];
 				this.Smallest = a[0];
 
-				this.Size = a[0].Size - 1;
+				this.Size = a[0].Size;
 				int index = 0;
 				for (int i = 1; i < a.Length; ++i) {
 					this.Size += a[i].Size;
@@ -239,6 +241,8 @@ namespace POESKillTree
 						this.Parts[index++] = a[i];
 					}
 				}
+
+				this.SteinerCount = Parts.Sum(p => p.SteinerCount());
 			}
 
 			public TreePart Containing(ushort node)
@@ -287,15 +291,11 @@ namespace POESKillTree
 				return false;
 			}
 
-			public int SteinerCount()
-			{
-				return Parts.Sum(p => p.SteinerCount());
-			}
-
 			public int Size;
 			public TreePart[] Parts;
 			public TreePart   Smallest;
             public ulong[] edgeBitField = new ulong[10];
+			public int SteinerCount;
 		}
 
 		public List<TreePart> SolveSimpleGraph(IEnumerable<SkillNode> solveSet, int maxSize)
@@ -342,12 +342,13 @@ namespace POESKillTree
 				TreePart smallest = group.Smallest;
 
 				foreach (ushort node in smallest.Nodes) {
+					int remaining = maxSize - group.Size;
 					foreach (var next in neighbors[node]) {
 						if (smallest.Nodes.Contains(next.Key))
 							continue;
 
-                        if (group.Size + next.Value - 1 > maxSize)
-                            continue;
+						if (next.Value > remaining)
+							continue;
 
 						TreePart part = new TreePart(smallest);
 						Edge edge = new Edge(node, next.Key);
@@ -381,10 +382,7 @@ namespace POESKillTree
 							newGroup = new TreeGroup(part, group.Parts);
 						}
 
-						if (newGroup.Size > maxSize)
-							continue;
-
-						if (newGroup.SteinerCount() > maxSteiners)
+						if (newGroup.SteinerCount > maxSteiners)
 							continue;
 
 						if (newGroup.Parts.Length == 0) {
@@ -392,11 +390,14 @@ namespace POESKillTree
 								solutions.Clear();
 								maxSize = newGroup.Size;
 							}
-							newGroup.Smallest.Size = maxSize; ;
+
 							solutions.Add(newGroup.Smallest);
 						//	groups.CapPriority(maxSize);
 							continue;
 						}
+
+						if (newGroup.Size >= maxSize)
+							continue;
 
 						groups.Enqueue(newGroup, newGroup.Size);
 					}
@@ -420,7 +421,7 @@ namespace POESKillTree
 				DrawSimpleGraph(SimpleGraph);
 
 				Stopwatch solutionTime = Stopwatch.StartNew();
-				var solutions = SolveSimpleGraph(SolveSet, 66);
+				var solutions = SolveSimpleGraph(SolveSet, 120);
 				solutionTime.Stop();
 				Console.WriteLine("{0} solutions found!", solutions.Count);
 				if (solutions.Count > 0)
@@ -676,6 +677,7 @@ namespace POESKillTree
 					List<TreePart> solutions = SolveSimpleGraph(new SkillNode[] { origin, destination }, distance);
                     if (solutions.Count() > 1 || solutions.First().Size < distance)
                     {
+
 						SimpleGraph[origin].Remove(destination);
 						SimpleGraph[destination].Remove(origin);
 						return true;
