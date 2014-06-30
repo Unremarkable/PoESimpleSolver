@@ -109,7 +109,7 @@ namespace POESKillTree
 
 			using (DrawingContext dc = picSolvePaths.RenderOpen()) {
 				for (int i = 0; i < edgesList.Count; ++i) {
-					foreach (var edge in edgesList[i].Edges) {
+					foreach (var edge in edgesList[i].Edges.ToList()) {
 						if (!edgeMap.ContainsKey(edge))
 							edgeMap[edge] = new List<int>();
 						edgeMap[edge].Add(i);

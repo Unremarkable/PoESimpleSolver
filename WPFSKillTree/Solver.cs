@@ -9,13 +9,12 @@ namespace POESKillTree
 {
 	public class Solver
 	{
-		public class Edge
+        public class Edge
 		{
-			public ushort left;
-			public ushort right;
-			public int id;
+            public ushort left;
+            public ushort right;
 
-			public Edge(ushort left, ushort right)
+            public Edge(ushort left, ushort right)
 			{
 				this.left = left;
 				this.right = right;
@@ -34,13 +33,202 @@ namespace POESKillTree
 			}
 		}
 
-		public class TreePart
+        public class BitFieldSet<T>
+        {
+            private ulong[] bitField;
+            private BitFieldSetFactory<T> parent;
+
+            public BitFieldSet(ulong[] field, BitFieldSetFactory<T> parent)
+            {
+                this.bitField = field;
+                this.parent = parent;
+            }
+
+            public void Recycle()
+            {
+                parent.bufferPool.Push(bitField);
+                this.bitField = null;
+            }
+
+            public bool Contains(T value)
+            {
+                return this[parent.GetId(value)];
+            }
+
+            public void Add(T value)
+            {
+                this[parent.GetId(value)] = true;
+            }
+
+            public void Merge(BitFieldSet<T> other)
+            {
+                for (ushort i = 0; i < bitField.Length; i++)
+                {
+                    this.bitField[i] |= other.bitField[i];
+                }
+            }
+
+            public List<ushort> GetIds(){
+                List<ushort> ids = new List<ushort>();
+                for(ushort i = 0; i < bitField.Length; i++){
+                    if(bitField[i] == 0){
+                        continue;
+                    }
+                    for(ushort j = 0; j < 64; j++){
+                        if((bitField[i] & (1ul << j)) !=0 ){
+                            ids.Add((ushort)(64*i + j));
+                        }
+                    }
+                }
+                return ids;
+            }
+
+            public List<T> ToList()
+            {
+                List<T> objects = new List<T>();
+                for (ushort i = 0; i < bitField.Length; i++)
+                {
+                    if (bitField[i] == 0)
+                    {
+                        continue;
+                    }
+                    for (ushort j = 0; j < 64; j++)
+                    {
+                        if ((bitField[i] & (1ul << j)) != 0)
+                        {
+                            ushort id = (ushort)(64 * i + j);
+                            objects.Add(parent.registry[id]);
+                        }
+                    }
+                }
+                return objects;
+            }
+
+            public void CopyTo(BitFieldSet<T> other)
+            {
+                this.bitField.CopyTo(other.bitField, 0);
+            }
+
+            public override bool Equals(object obj)
+            {
+                for (int i = 0; i < bitField.Length; i++)
+                {
+                    if (this.bitField[i] != (obj as BitFieldSet<T>).bitField[i])
+                        return false;
+                }
+                return true;
+            }
+
+            public override int GetHashCode()
+            {
+                ulong hashCode = 0;
+                for (int i = 0; i < bitField.Length; i++)
+                    hashCode ^= bitField[i];
+                return (int)hashCode ^ (int)(hashCode >> 32);
+            }
+
+            public bool this[int index]
+            {
+                get
+                {
+                     return (bitField[index >> 6] & (1uL << (index & 0x3f))) != 0;
+                }
+                set
+                {
+                    if(value){
+                        bitField[index >> 6] |= 1uL << (index & 0x3f);
+                    }else{
+                        bitField[index >> 6] &= ~(1uL << (index & 0x3f));
+                    }   
+                }
+            }
+        }
+
+        public class BitFieldSetFactory<T>
+        {
+            private int bitArraySize;
+            private ushort idCount = 1;
+            public Stack<ulong[]> bufferPool = new Stack<ulong[]>();
+            public Dictionary<ushort, T> registry;
+            public Dictionary<T, ushort> reverseRegistry;
+
+            public BitFieldSetFactory(int size)
+            {
+                this.bitArraySize = (size >> 6) + 1;
+                registry = new Dictionary<ushort, T>();
+                reverseRegistry = new Dictionary<T, ushort>();
+            }
+
+            public void Register(T value)
+            {
+                if (!reverseRegistry.ContainsKey(value))
+                {
+                    reverseRegistry[value] = idCount;
+                    registry[idCount] = value;
+                    idCount++;
+                }
+            }
+
+            public ushort GetId(T value)
+            {
+                if (!reverseRegistry.ContainsKey(value))
+                {
+                    reverseRegistry[value] = idCount;
+                    registry[idCount] = value;
+                    idCount++;
+                }
+                return reverseRegistry[value];
+            }
+
+            public BitFieldSet<T> NewSet()
+            {
+                ulong[] bitArray = null;
+                while (bufferPool.Count > 0 && bitArray == null)
+                {
+                    bitArray = bufferPool.Pop();
+                }
+
+                if (bitArray == null)
+                {
+                    bitArray = new ulong[bitArraySize];
+                }
+                else
+                {
+                    Array.Clear(bitArray, 0, bitArray.Length);
+                    recycleCount++;
+                }
+                return new BitFieldSet<T>(bitArray, this);
+            }
+
+            public BitFieldSet<T> NewSet(BitFieldSet<T> clone)
+            {
+                ulong[] bitArray = null;
+                while (bufferPool.Count > 0 && bitArray == null)
+                {
+                    bitArray = bufferPool.Pop();
+                }
+
+                if (bitArray == null)
+                {
+                    bitArray = new ulong[bitArraySize];
+                }
+                else
+                {
+                    recycleCount++;
+                }
+                BitFieldSet<T> newSet = new BitFieldSet<T>(bitArray, this);
+                clone.CopyTo(newSet);
+                return newSet;
+            }
+        }
+
+        public class TreePart
 			: IEquatable<TreePart>
 		{
-			public TreePart(ushort start)
+            public TreePart(ushort start)
 			{
-				this.Nodes = new HashSet<ushort>();
-				this.Edges = new List<Edge>();
+                this.Nodes = NodeSetFactory.NewSet();
+				this.Edges = EdgeSetFactory.NewSet();
 				this.Size = 0;
 
 				this.Nodes.Add(start);
@@ -48,37 +236,28 @@ namespace POESKillTree
 
 			public TreePart(TreePart clone)
 			{
-				this.Nodes = new HashSet<ushort>(clone.Nodes);
-				this.Edges = new List<Edge>(clone.Edges);
-				clone.edgeBitField.CopyTo(this.edgeBitField, 0);
+                this.Nodes = NodeSetFactory.NewSet(clone.Nodes);
+                this.Edges = EdgeSetFactory.NewSet(clone.Edges);
 				this.Size = clone.Size;
 			}
 
+        //    ~TreePart()
+       //     {
+      //          Recycle();
+      //      }
+
 			public void merge(TreePart other)
 			{
-				Nodes.UnionWith(other.Nodes);
-				foreach (Edge edge in other.Edges) {
-					addEdge(edge);
-				}
+				Nodes.Merge(other.Nodes);
+                Edges.Merge(other.Edges);
 				Size += other.Size;
-			}
-
-			public void addEdge(Edge newEdge)
-			{
-				//  Console.WriteLine(" addEdge " + newEdge.id / sizeof(long));
-				edgeBitField[newEdge.id / 64] |= 1uL << (newEdge.id % 64);
-				Edges.Add(newEdge);
 			}
 
 			public bool Equals(TreePart other)
 			{
 				if (this.Size != other.Size)
 					return false;
-				for (int i = 0; i < edgeBitField.Length; i++) {
-					if (this.edgeBitField[i] != other.edgeBitField[i])
-						return false;
-				}
-				return true;
+				return this.Edges.Equals(other.Edges);
 			}
 
 			public override bool Equals(object obj)
@@ -90,33 +269,35 @@ namespace POESKillTree
 
 			public override int GetHashCode()
 			{
-				ulong hashCode = 0;
-				for (int i = 0; i < edgeBitField.Length; i++)
-					hashCode ^= edgeBitField[i];
-				return (int)hashCode ^ (int)(hashCode >> 32);
+                return Edges.GetHashCode();
 			}
 
+            public void Recycle()
+            {
+                this.Edges.Recycle();
+                this.Nodes.Recycle();
+            }
+
 			public int Size;
-			public List<Edge> Edges;
-			public HashSet<ushort> Nodes;
-			public ulong[] edgeBitField = new ulong[10];
+            public BitFieldSet<Edge> Edges;
+            public BitFieldSet<ushort> Nodes;
 		}
 
-		public class TreeGroup
+        public class TreeGroup
 			: IEquatable<TreeGroup>
 		{
 			public TreeGroup(TreePart a, TreePart[] b)
 			{
 				this.Parts = new TreePart[b.Length];
 				this.Smallest = a;
-				AddToEdgeBitField(a);
-
+                this.Edges = EdgeSetFactory.NewSet(a.Edges);
+				
 				this.Size = a.Size;
 				int index = 0;
 				for (int i = 0; i < b.Length; ++i) {
 					this.Size += b[i].Size;
 
-					AddToEdgeBitField(b[i]);
+                    this.Edges.Merge(b[i].Edges);
 
 					if (b[i].Size < Smallest.Size) {
 						this.Parts[index++] = Smallest;
@@ -131,13 +312,14 @@ namespace POESKillTree
 			{
 				this.Parts = new TreePart[a.Length - 1];
 				this.Smallest = a[0];
+                this.Edges = EdgeSetFactory.NewSet();
 
 				this.Size = a[0].Size;
 				int index = 0;
 				for (int i = 1; i < a.Length; ++i) {
 					this.Size += a[i].Size;
 
-					AddToEdgeBitField(a[i]);
+                    this.Edges.Merge(a[i].Edges);
 
 					if (a[i].Size < Smallest.Size) {
 						this.Parts[index++] = Smallest;
@@ -158,30 +340,15 @@ namespace POESKillTree
 
 			public override int GetHashCode()
 			{
-				ulong hashCode = 0;
-				for (int i = 0; i < edgeBitField.Length; i++) {
-					hashCode ^= edgeBitField[i];
-				}
-				return (int)hashCode ^ (int)(hashCode >> 32);
-			}
-
-			private void AddToEdgeBitField(TreePart part)
-			{
-				for (int i = 0; i < edgeBitField.Length; i++) {
-					edgeBitField[i] |= part.edgeBitField[i];
-				}
+                return Edges.GetHashCode();
 			}
 
 			public bool Equals(TreeGroup other)
 			{
 				if (this.Size != other.Size)
 					return false;
-				for (int i = 0; i < edgeBitField.Length; i++) {
-					if (this.edgeBitField[i] != other.edgeBitField[i])
-						return false;
-				}
-
-				return true;
+				
+				return this.Edges.Equals(other.Edges);
 			}
 
 			public override bool Equals(object obj)
@@ -191,10 +358,15 @@ namespace POESKillTree
 				return false;
 			}
 
+            public void Recycle()
+            {
+                Edges.Recycle();
+            }
+
 			public int Size;
 			public TreePart[] Parts;
 			public TreePart Smallest;
-			public ulong[] edgeBitField = new ulong[10];
+            public BitFieldSet<Edge> Edges;
 		}
 
 		public List<TreePart> Solve(HashSet<ushort> solveSet)
@@ -202,6 +374,10 @@ namespace POESKillTree
 			var graph = ConstructSimpleGraph(solveSet);
 			
 			RemoveExternals(graph, solveSet);
+
+            
+            Solver.EdgeSetFactory = new BitFieldSetFactory<Edge>(graph.Values.Sum(n => n.Count));
+            Solver.NodeSetFactory = new BitFieldSetFactory<ushort>(graph.Count);
 
 			Stopwatch simplifyTime = Stopwatch.StartNew();
 			while (Simplify(graph, solveSet)) ;
@@ -212,13 +388,18 @@ namespace POESKillTree
 			Console.WriteLine("Edges: {0}", graph.Sum(dict => dict.Value.Count));
 
 			Stopwatch solutionTime = Stopwatch.StartNew();
+
+            recycleCount = 0;
+            Solver.EdgeSetFactory = new BitFieldSetFactory<Edge>(graph.Values.Sum(n => n.Count));
+            Solver.NodeSetFactory = new BitFieldSetFactory<ushort>(graph.Count);
+
 			var solutions = SolveSimpleGraph(graph, solveSet, 120);
 			solutionTime.Stop();
 			Console.WriteLine("{0} solutions found!", solutions.Count);
 			if (solutions.Count > 0)
 				Console.WriteLine("{0} points used.", solutions.First().Size);
 			Console.WriteLine("Solve time: {0}", solutionTime.Elapsed);
-
+            Console.WriteLine(recycleCount);
 			return solutions;
 		}
 
@@ -227,7 +408,7 @@ namespace POESKillTree
 			this.Graph = graph;
 			this.ShortestPathTable = new Dictionary<ushort, Dictionary<ushort, Tuple<HashSet<ushort>, int>>>();
 
-			CalculateAllShortestPaths();
+            CalculateAllShortestPaths();
 		}
 
 
@@ -346,7 +527,7 @@ namespace POESKillTree
 
 		private bool Simplify(Dictionary<ushort, Dictionary<ushort, int>> graph, HashSet<ushort> solveSet)
 		{
-			foreach (ushort node in graph.Keys) {
+            foreach (ushort node in graph.Keys) {
 				if (solveSet.Contains(node)/* || SkilledNodes.Contains(node.id)*/)
 					continue;
 
@@ -459,9 +640,6 @@ namespace POESKillTree
 
 		private List<TreePart> SolveSimpleGraph(Dictionary<ushort, Dictionary<ushort, int>> graph, IEnumerable<ushort> solveSet, int maxSize)
 		{
-			int edgeIdCount = 0;
-			Dictionary<Edge, int> allEdges = new Dictionary<Edge, int>();
-
 			BucketQueue<TreeGroup> groups = new BucketQueue<TreeGroup>();
 
 			List<TreePart> initialParts = new List<TreePart>();
@@ -493,7 +671,7 @@ namespace POESKillTree
 
 				TreePart smallest = group.Smallest;
 
-				foreach (ushort node in smallest.Nodes) {
+				foreach (ushort node in smallest.Nodes.ToList()) {
 					int remaining = maxSize - group.Size;
 					foreach (var next in graph[node]) {
 						if (smallest.Nodes.Contains(next.Key))
@@ -504,16 +682,9 @@ namespace POESKillTree
 
 						TreePart part = new TreePart(smallest);
 						Edge edge = new Edge(node, next.Key);
-						if (allEdges.ContainsKey(edge)) {
-							edge.id = allEdges[edge];
-						} else {
-							edge.id = edgeIdCount++;
-							//  Console.WriteLine(edge.id);
-							allEdges[edge] = edge.id;
-						}
 
 						part.Nodes.Add(next.Key);
-						part.addEdge(edge);
+						part.Edges.Add(edge);
 						part.Size += next.Value;
 
 						TreePart mergePart = group.Containing(next.Key);
@@ -549,6 +720,7 @@ namespace POESKillTree
 						groups.Enqueue(newGroup, newGroup.Size);
 					}
 				}
+                group.Recycle();
 			}
 
 			return solutions.ToList();
@@ -558,8 +730,11 @@ namespace POESKillTree
 		{
 			return ShortestPathTable[a][b].Item1;
 		}
+        private static int recycleCount = 0;
 
 		private Dictionary<ushort, SkillTree.SkillNode> Graph;
 		private Dictionary<ushort, Dictionary<ushort, Tuple<HashSet<ushort>, int>>> ShortestPathTable;
+        private static BitFieldSetFactory<ushort> NodeSetFactory;
+        private static BitFieldSetFactory<Edge> EdgeSetFactory;
 	}
 }
